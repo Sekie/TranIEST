@@ -208,13 +208,6 @@ class MP2Bath:
 		self.QS = np.eye(PS.shape[0]) - PS
 		self.QE = np.eye(PE.shape[0]) - PE
 	
-	def CalcAijpq_MF(self, i, j, p, q):
-		CrSymbols = ['id', 'jd', 'p']
-		AnSymbols = ['i', 'j', 'q']
-		FixedCrS = ['id', 'jd', 'p']
-		FixedAnS = ['i', 'j', 'q']
-		SymbolsS, SymbolsE = GenerateSubspaceCases(CrSymbols, AnSymbols, FixedCrS = FixedCrS, FixedAnS = FixedAnS)
-
 	def GetAmplitudeIndices(self, SymbolS):
 		tIndices, uIndices, vIndices, wIndices = []
 		if 't' in SymbolS[0]:
@@ -256,7 +249,7 @@ class MP2Bath:
 		return i
 
 	'''
-	Calculates A for given indices pqrsijkl
+	Calculates A for given indices ijkl, pqrs
 	'''
 	def CalcAElements(self, CrSymbols, AnSymbols, NormalOrder, OrbitalListNoT, FixedCrS = None, FixedAnS = None, Case = 'MF'):
 		SymbolsS, SymbolsE = GenerateSubspaceCases(CrSymbols, AnSymbols, FixedCrS = FixedCrS, FixedAnS = FixedAnS)
@@ -344,260 +337,14 @@ class MP2Bath:
 							A[ijkl, pq] = CalcAElements(['id', 'jd', 'kd', 'ld', 'p'], ['i', 'j', 'k', 'l', 'q'], ['id', 'i', 'jd', 'j', 'kd', 'k', 'ld', 'l', 'p', 'q'], [i, i, j, j, k, k, l, l, p, q], FixedCrS = ['id', 'jd', 'kd', 'ld', 'p'], FixedAnS = ['i', 'j', 'k', 'l', 'q'], Case = 'MF')
 							A[ijkl, pq] += CalcAElements(['id', 'jd', 'kd', 'ld', 'p', 'v', 'w'], ['i', 'j', 'k', 'l', 'q', 'u', 't'], ['id', 'i', 'jd', 'j', 'kd', 'k', 'ld', 'l', 'p', 'q', 'v', 'w', 'u', 't'], [i, i, j, j, k, k, l, l, p, q], FixedCrS = ['id', 'jd', 'kd', 'ld', 'p'], FixedAnS = ['i', 'j', 'k', 'l', 'q'], Case = 'Right')
 							A[ijkl, pq] += CalcAElements(['t'. 'u', 'id', 'jd', 'kd', 'ld', 'p'], ['w', 'v', 'i', 'j', 'k', 'l', 'q'], ['t', 'u', 'w', 'v', 'id', 'i', 'jd', 'j', 'kd', 'k', 'ld', 'l', 'p', 'q'], [i, i, j, j, k, k, l, l, p, q], FixedCrS = ['id', 'jd', 'kd', 'ld', 'p'], FixedAnS = ['i', 'j', 'k', 'l', 'q'], Case = 'Left')
-								
-
-		# Go through each of the 9 blocks.
-	
-	def CalcAijpq_R(self, i, j, p, q):
-		CrSymbols = ['id', 'jd', 'p', 'v', 'w']
-		AnSymbols = ['i', 'j', 'q', 'u', 't']
-		FixedCrS = ['id', 'jd', 'p']
-		FixedAnS = ['i', 'j', 'q']
-		SymbolsS, SymbolsE = GenerateSubspaceCases(CrSymbols, AnSymbols, FixedCrS = FixedCrS, FixedAnS = FixedAnS)
-		Aijpq_R = 0.0
-		for a in range(len(SymbolsS)):
-			tIndices, uIndices, vIndices, wIndices = GetAmplitudeIndices(SymbolsS[a])
-			for t in tIndices:
-				for u in uIndices:
-					for v in vIndices:
-						for w in wIndices:
-							NormalOrder = ['id', 'i', 'jd', 'j', 'p', 'q', 'v', 'w', 'u', 't']
-							OrbitalList = [i, i, j, j, p, q, v, w, u, t]
-							ExpSE = self.CalcExpValue(SymbolsS[a], SymbolsE[a], NormalOrder, OrbitalList)
-							#ExpSEj, ExpSEi, ExpSE1 = 0.0
-							#if i in self.BIndex:
-							#	NormOrder = NormalOrder.copy()
-							#	NormOrder.remove('id')
-							#	NormOrder.remove('i')
-							#	OrbList = [j, j, p, q, v, w, u, t]
-							#	SymS = SymbolsS[a].copy()
-							#	SymE = SymbolsE[a].copy()
-							#	SymS[0].remove('id')
-							#	SymS[1].remove('i')
-							#	ExpSEj = self.CalcExpVal(SymS, SymE, NormOrder, OrbList)
-							#	if j not in self.BIndex:
-							#		ExpSE = ExpSEj - ExpSE
-							#if j in self.BIndex:
-							#	NormOrder = NormalOrder.copy()
-							#	NormOrder.remove('jd')
-							#	NormOrder.remove('j')
-							#	OrbList = [i, i, p, q, v, w, u, t]
-							#	SymS = SymbolsS[a].copy()
-							#	SymE = SymbolsE[a].copy()
-							#	SymS[0].remove('jd')
-							#	SymS[1].remove('j')
-							#	ExpSEi = self.CalcExpVal(SymS, SymE, NormOrder, OrbList)
-							#	if i not in self.BIndex:
-							#		ExpSE = ExpSEi - ExpSE
-							#if i in self.BIndex and j in self.BIndex:
-							#	NormOrder = NormalOrder.copy()
-							#	NormOrder.remove('id')
-							#	NormOrder.remove('i')
-							#	NormOrder.remove('jd')
-							#	NormOrder.remove('j')
-							#	OrbList = [p, q, v, w, u, t]
-							#	SymS = SymbolsS[a].copy()
-							#	SymE = SymbolsE[a].copy()
-							#	SymS[0].remove('id')
-							#	SymS[0].remove('jd')
-							#	SymS[1].remove('i')
-							#	SymS[1].remove('j')
-							#	ExpSE1 = self.CalcExpVal(SymS, SymE, NormOrder, OrbList)
-							#	ExpSE = ExpSE1 - ExpSEi - ExpSEj + ExpSE
-
-							Aijpq_R += self.t[t, u, v, w] * ExpSE
-
-
-	def CalcAijpq_L(self, i, j, p, q):
-		CrSymbols = ['id', 'jd', 'p', 't', 'u']
-		AnSymbols = ['i', 'j', 'q', 'w', 'v']
-		FixedCrS = ['id', 'jd', 'p']
-		FixedAnS = ['i', 'j', 'q']
-		#SymbolsS, SymbolsE = GenerateSubspaceCases(CrSymbols, AnSymbols, FixedCrS = FixedCrS, FixedAnS = FixedAnS)
-		Aijpq_L = 0.0
-		for a in range(len(SymbolsS)):
-			tIndices, uIndices, vIndices, wIndices = GetAmplitudeIndices(SymbolsS[a])
-			for t in tIndices:
-				for u in uIndices:
-					for v in vIndices:
-						for w in wIndices:
-							NormalOrder = ['t', 'u', 'w', 'v', 'id', 'i', 'jd', 'j', 'p', 'q']
-							OrbitalList = [t, u, w, v, i, i, j, j, p, q]
-							ExpSE = self.CalcExpValue(SymbolsS[a], SymbolsE[a], NormalOrder, OrbitalList)
-							#ExpSEj, ExpSEi, ExpSE1 = 0.0
-							#if i in self.BIndex:
-							#	NormOrder = NormalOrder.copy()
-							#	NormOrder.remove('id')
-							#	NormOrder.remove('i')
-							#	OrbList = [t, u, w, v, j, j, p, q]
-							#	SymS = SymbolsS[a].copy()
-							#	SymE = SymbolsE[a].copy()
-							#	SymS[0].remove('id')
-							#	SymS[1].remove('i')
-							#	ExpSEj = self.CalcExpVal(SymS, SymE, NormOrder, OrbList)
-							#	if j not in self.BIndex:
-							#		ExpSE = ExpSEj - ExpSE
-							#if j in self.BIndex:
-							#	NormOrder = NormalOrder.copy()
-							#	NormOrder.remove('jd')
-							#	NormOrder.remove('j')
-							#	OrbList = [t, u, w, v, i, i, p, q]
-							#	SymS = SymbolsS[a].copy()
-							#	SymE = SymbolsE[a].copy()
-							#	SymS[0].remove('jd')
-							#	SymS[1].remove('j')
-							#	ExpSEi = self.CalcExpVal(SymS, SymE, NormOrder, OrbList)
-							#	if i not in self.BIndex:
-							#		ExpSE = ExpSEi - ExpSE
-							#if i in self.BIndex and j in self.BIndex:
-							#	NormOrder = NormalOrder.copy()
-							#	NormOrder.remove('id')
-							#	NormOrder.remove('i')
-							#	NormOrder.remove('jd')
-							#	NormOrder.remove('j')
-							#	OrbList = [t, u, w, v, p, q]
-							#	SymS = SymbolsS[a].copy()
-							#	SymE = SymbolsE[a].copy()
-							#	SymS[0].remove('id')
-							#	SymS[0].remove('jd')
-							#	SymS[1].remove('i')
-							#	SymS[1].remove('j')
-							#	ExpSE1 = self.CalcExpVal(SymS, SymE, NormOrder, OrbList)
-							#	ExpSE = ExpSE1 - ExpSEi - ExpSEj + ExpSE
-
-							Aijpq_L += self.t[t, u, v, w] * ExpSE
-
-	def CalcAijpq_MF(self, i, j, p, q):
-		CrSymbols = ['id', 'jd', 'p']
-		AnSymbols = ['i', 'j', 'q']
-		FixedCrS = ['id', 'jd', 'p']
-		FixedAnS = ['i', 'j', 'q']
-		SymbolsS, SymbolsE = GenerateSubspaceCases(CrSymbols, AnSymbols, FixedCrS = FixedCrS, FixedAnS = FixedAnS)
-		Aijpq_MF = 0.0
-		for a in range(len(SymbolsS)):
-			tIndices, uIndices, vIndices, wIndices = GetAmplitudeIndices(SymbolsS[a])
-			for t in tIndices:
-				for u in uIndices:
-					for v in vIndices:
-						for w in wIndices:
-							NormalOrder = ['id', 'i', 'jd', 'j', 'p', 'q']
-							OrbitalList = [i, i, j, j, p, q]
-							ExpSE = self.CalcExpValue(SymbolsS[a], SymbolsE[a], NormalOrder, OrbitalList)
-							#ExpSEj, ExpSEi, ExpSE1 = 0.0
-							#if i in self.BIndex:
-							#	NormOrder = NormalOrder.copy()
-							#	NormOrder.remove('id')
-							#	NormOrder.remove('i')
-							#	OrbList = [j, j, p, q]
-							#	SymS = SymbolsS[a].copy()
-							#	SymE = SymbolsE[a].copy()
-							#	SymS[0].remove('id')
-							#	SymS[1].remove('i')
-							#	ExpSEj = self.CalcExpVal(SymS, SymE, NormOrder, OrbList)
-							#	if j not in self.BIndex:
-							#		ExpSE = ExpSEj - ExpSE
-							#if j in self.BIndex:
-							#	NormOrder = NormalOrder.copy()
-							#	NormOrder.remove('jd')
-							#	NormOrder.remove('j')
-							#	OrbList = [i, i, p, q]
-							#	SymS = SymbolsS[a].copy()
-							#	SymE = SymbolsE[a].copy()
-							#	SymS[0].remove('jd')
-							#	SymS[1].remove('j')
-							#	ExpSEi = self.CalcExpVal(SymS, SymE, NormOrder, OrbList)
-							#	if i not in self.BIndex:
-							#		ExpSE = ExpSEi - ExpSE
-							#if i in self.BIndex and j in self.BIndex:
-							#	NormOrder = NormalOrder.copy()
-							#	NormOrder.remove('id')
-							#	NormOrder.remove('i')
-							#	NormOrder.remove('jd')
-							#	NormOrder.remove('j')
-							#	OrbList = [p, q]
-							#	SymS = SymbolsS[a].copy()
-							#	SymE = SymbolsE[a].copy()
-							#	SymS[0].remove('id')
-							#	SymS[0].remove('jd')
-							#	SymS[1].remove('i')
-							#	SymS[1].remove('j')
-							#	ExpSE1 = self.CalcExpVal(SymS, SymE, NormOrder, OrbList)
-							#	ExpSE = ExpSE1 - ExpSEi - ExpSEj + ExpSE
-
-							Aijpq_MF += self.t[t, u, v, w] * ExpSE	
-
-	def MP2Expectation_ijpq(self, i, j, p, q, t, u, v, w, IndexS, IndexE, Case):
-		NormalOrder = []
-		OrbitalList = []
-		IdxS = IndexS
-		IdxE = IndexE
-		if Case == 'Right':
-			IdxS[0] = ['id', 'jd'] + IndexS[0]
-			IdxS[1] = ['i', 'j'] + IndexS[1]
-			NormalOrder = ['id', 'i', 'jd', 'j', 'p', 'q', 'v', 'w', 't', 'u']
-			OrbitalList = [i, i, j, j, p, q, v, w, t, u]
-			PosS, PosE, OrbS, OrbE = CaseToOperatorPositions(IndexS, IndexE, NormalOrder)
-			Sign = SignOfSeparation(PosE[0] + PosE[1])
-			ConS, PorQS, SignsS = WickContraction(PosS[0], PosS[1], OrbList = OrbitalList)
-			ConE, PorQE, SignsE = WickContraction(PosE[0], PosE[1], OrbList = OrbitalList)
-			ExpS = CalcWickTerms(ConS, PorQS, SignsS, self.PS, self.QS)
-			ExpE = CalcWickTerms(ConE, PorQE, SignsE, self.PE, self.QE)
-			
-		
-
-	def CalcXij(self, i, j, p, q):
-		# MP2 correction on the right
-		CrIndex = ['p', 'v', 'w']
-		AnIndex = ['q', 't', 'u']
-		FixedCrS = None
-		FixedAnS = None
-		FixedCrE = None
-		FoxedAnE = None
-		if p in self.SIndex:
-			FixedCrS = ['p']
-		else:
-			FixedCrE = ['p']
-		if q in self.SIndex:
-			FixedAnS = ['q']
-		else:
-			FixedAnE = ['q']
-
-		IndicesS, IndicesE = GenerateSubspaceCases(CrIndex, AnIndex, FixedCrA = FixedCrS, FixedAnA = FixedAnS, FixedCrB = FixedCrE, FixedAnB = FixedAnE)
-
-		# MP2 Wavefunction on the Right
-		Xijpq = 0.0
-		for a in range(len(IndicesS)):
-			tIndices, uIndices, vIndices, wIndices = []
-			if 't' in IndicesS[a][0]:
-				tIndices = self.SIndex
-			else:
-				tIndices = self.EIndex
-			if 'u' in IndicesS[a][0]:
-				uIndices = self.SIndex
-			else:
-				uIndices = self.EIndex
-			if 'v' in IndicesS[a][1]:
-				vIndices = self.SIndex
-			else:
-				vIndices = self.EIndex
-			if 'w' in IndicesS[a][1]:
-				wIndices = self.SIndex
-			else:
-				wIndices = self.EIndex
-				
-			IndexE = IndicesE[a]
-			IndexS = IndicesS[a]
-			IndexS[0] = ['id', 'jd'] + IndicesS[a][0]
-			IndexS[1] = ['i', 'j'] + IndicesS[a][1]
-			#PosS, PosE = CaseToOperatorPositions(IndexS, IndexE, ['id', 'i', 'jd', 'j', 'p', 'q', 'v', 'w', 't', 'u'])
-
-			for t in tIndices:
-				for u in uIndices:
-					for v in vIndices:
-						for w in wIndices:
-							Xijpq += self.t[t, u, v, w]# * MP2ExpVal(IndicesS[a], IndicesE[a])
-			
-			
+								# pqrs - Case 2
+								for r in self.SIndex:
+									for s in self.SIndex:	
+										pqrs = self.CombinedIndex([p, q, r, s])
+										A[ijkl, pqrs] = CalcAElements(['id', 'jd', 'kd', 'ld', 'p', 'r'], ['i', 'j', 'k', 'l', 's', 'q'], ['id', 'i', 'jd', 'j', 'kd', 'k', 'ld', 'l', 'p', 'r', 's', 'q'], [i, i, j, j, k, k, l, l, p, r, s, q], FixedCrS = ['id', 'jd', 'kd', 'ld', 'p', 'r'], FixedAnS = ['i', 'j', 'k', 'l', 's', 'q'], Case = 'MF')
+										A[ijkl, pq] += CalcAElements(['id', 'jd', 'kd', 'ld', 'p', 'r', 'v', 'w'], ['i', 'j', 'k', 'l', 's', 'q', 'u', 't'], ['id', 'i', 'jd', 'j', 'kd', 'k', 'ld', 'l', 'p', 'r', 's', 'q', 'v', 'w', 'u', 't'], [i, i, j, j, k, k, l, l, p, r, s, q], FixedCrS = ['id', 'jd', 'kd', 'ld', 'p', 'r'], FixedAnS = ['i', 'j', 'k', 'l', 's', 'q'], Case = 'Right')
+										A[ijkl, pq] += CalcAElements(['t'. 'u', 'id', 'jd', 'kd', 'ld', 'p'. 'r'], ['w', 'v', 'i', 'j', 'k', 'l', 's', 'q'], ['t', 'u', 'w', 'v', 'id', 'i', 'jd', 'j', 'kd', 'k', 'ld', 'l', 'p', 'r', 's', 'q'], [i, i, j, j, k, k, l, l, p, r, s, q], FixedCrS = ['id', 'jd', 'kd', 'ld', 'p', 'r'], FixedAnS = ['i', 'j', 'k', 'l', 's', 'q'], Case = 'Left')
+		return A
 
 if __name__ == '__main__':
 	#CrA, AnA, CrB, AnB = SeparateOperatorIndices([0, 2, 4], [1, 3, 7], [5], [6])
