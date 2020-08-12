@@ -197,19 +197,25 @@ def CalcWickTerms(Contractions, PorQ, Signs, P, Q):
 
 
 class MP2Bath:
-	def __init__(self, t, FIndex, BIndex, EIndex, PS, PE):
+	def __init__(self, t, FIndex, BIndex, EIndex, PS, PE, h, V):
 		self.t = t
 		self.FIndex = FIndex
 		self.BIndex = BIndex
 		self.SIndex = FIndex + BIndex
 		self.EIndex = EIndex
+		self.AllIndex = self.SIndex + EIndex
 		self.PS = PS
 		self.PE = PE
 		self.QS = np.eye(PS.shape[0]) - PS
 		self.QE = np.eye(PE.shape[0]) - PE
+		self.h = h
+		self.V = V
 	
 	def GetAmplitudeIndices(self, SymbolS):
-		tIndices, uIndices, vIndices, wIndices = []
+		tIndices = []
+		uIndices = [] 
+		vIndices = []
+		wIndices = []
 		if 't' in SymbolS[0]:
 			tIndices = self.SIndex
 		else:
@@ -227,6 +233,32 @@ class MP2Bath:
 		else:
 			wIndices = self.EIndex
 		return tIndices, uIndices, vIndices, wIndices
+
+	def GetPQIndices(self, SymbolS):
+		pIndices = []
+		qIndices = []
+		if 'p' in SymbolS[0]:
+			pIndices = self.SIndex
+		else:
+			pIndices = self.EIndex
+		if 'q' in SymbolsS[0]:
+			qIndices = self.SIndex
+		else:
+			qIndices = self.EIndex
+		return pIndices, qIndices
+
+	def GetRSIndices(self, SymbolS):
+		rIndices = []
+		sIndices = []
+		if 'r' in SymbolS[0]:
+			rIndices = self.SIndex
+		else:
+			rIndices = self.EIndex
+		if 's' in SymbolS[0]:
+			sIndices = self.SIndex
+		else:
+			sIndices = self.EIndex
+		return rIndices, sIndices
 
 	def CalcExpValue(self, SymbolS, SymbolE, NormalOrder, OrbitalList):
 		PosS, PosE = CaseToOperatorPosition(SymbolS, SymbolE, NormalOrder)
@@ -252,7 +284,7 @@ class MP2Bath:
 	Calculates A for given indices ijkl, pqrs
 	'''
 	def CalcAElements(self, CrSymbols, AnSymbols, NormalOrder, OrbitalListNoT, FixedCrS = None, FixedAnS = None, Case = 'MF'):
-		SymbolsS, SymbolsE = GenerateSubspaceCases(CrSymbols, AnSymbols, FixedCrS = FixedCrS, FixedAnS = FixedAnS)
+		SymbolsS, SymbolsE = GenerateSubspaceCases(CrSymbols, AnSymbols, FixedCrA = FixedCrS, FixedAnA = FixedAnS)
 		AElement = 0.0
 		if len(OrbitalListNoT) == 0 and Case == 'MF':
 			return 1.0
@@ -345,6 +377,77 @@ class MP2Bath:
 										A[ijkl, pq] += CalcAElements(['id', 'jd', 'kd', 'ld', 'p', 'r', 'v', 'w'], ['i', 'j', 'k', 'l', 's', 'q', 'u', 't'], ['id', 'i', 'jd', 'j', 'kd', 'k', 'ld', 'l', 'p', 'r', 's', 'q', 'v', 'w', 'u', 't'], [i, i, j, j, k, k, l, l, p, r, s, q], FixedCrS = ['id', 'jd', 'kd', 'ld', 'p', 'r'], FixedAnS = ['i', 'j', 'k', 'l', 's', 'q'], Case = 'Right')
 										A[ijkl, pq] += CalcAElements(['t'. 'u', 'id', 'jd', 'kd', 'ld', 'p'. 'r'], ['w', 'v', 'i', 'j', 'k', 'l', 's', 'q'], ['t', 'u', 'w', 'v', 'id', 'i', 'jd', 'j', 'kd', 'k', 'ld', 'l', 'p', 'r', 's', 'q'], [i, i, j, j, k, k, l, l, p, r, s, q], FixedCrS = ['id', 'jd', 'kd', 'ld', 'p', 'r'], FixedAnS = ['i', 'j', 'k', 'l', 's', 'q'], Case = 'Left')
 		return A
+
+	def CalcYElements(self, ProjectorOrbitalList):
+		NumP = len(ProjectorOrbitalList) # 0 for Case 0, 4 for Case 1, 8 for Case 2
+		NormalOrder1 = []
+		CrSymbols1 = []
+		AnSymbols1 = []
+		if NumP == 4:
+			NormalOrder1 = ['id', 'i', 'jd', 'j']
+			CrSymbols1 = ['id', 'jd']
+			AnSymbols1 = ['i', 'j']
+		if NumP == 8:
+			NormalOrder1 = ['id', 'i', 'jd', 'j', 'kd', 'k', 'ld', 'l']
+			CrSymbols1 = ['id', 'jd', 'kd', 'ld']
+			AnSymbols1 = ['i', 'j', 'k', 'l']
+		SymbolsS1, SymbolsE1 = GenerateSubspaceCases(CrSymbols1 + ['p'], AnSymbols1 + ['q'], FixedCrA = CrSymbols1, FixedAnA = AnSymbols1)
+		YElement = 0.0
+
+		for n in range(len(SymbolsS1)):
+			pIndices, qIndices = self.GetPQIndices(SymbolsS1[n])
+			tIndices, uIndices, vIndices, wIndices = GetAmplitudeIndices(SymbolsS1[n])
+			for p in pIndices:
+				for q in qIndices:
+					Ypq = 0.0
+					# MF Case
+					Ypq = self.CalcExpValue(SymbolsS1[n], SymbolsE1[n], NormalOrder1 + ['p', 'q'], ProjectorOrbitalList + [p, q])
+					for t in tIndices:
+						for u in uIndices:
+							for v in vIndices:
+								for w in wIndices:
+									ExpR = self.CalcExpValue(SymbolsS1[n], SymbolsE1[n], NormalOrder1 + ['p', 'q', 'v', 'w', 'u', 't'], ProjectorOrbitalList + [p, q, v, w, u ,t])
+									ExpL = self.CalcExpValue(SymbolsS1[n], SymbolsE1[n], ['t', 'u', 'w', 'v'] + NormalOrder1 + ['p', 'q'], [t, u, w, v] + ProjectorOrbitalList + [p, q])
+									Ypq += self.t[t, u, v, w] * (ExpR + ExpL)
+					Ypq *= self.h[p, q]
+					YElement += Ypq
+		SymbolsS2, SymbolsE2 = GenerateSubspaceCases(CrSymbols1 + ['p', 'r'], AnSymbols1 + ['s', 'q'], FixedCrA = CrSymbols1, FixedAnA = AnSymbols1)
+		for n in range(len(SymbolsS2)):
+			pIndices, qIndices = self.GetPQIndices(SymbolsS2[n])
+			rIndices, sIndices = self.getRSIndices(SymbolsS2[n])
+			tIndices, uIndices, vIndices, wIndices = GetAmplitudeIndices(SymbolsS2[n])
+			for p in pIndices:
+				for q in qIndices:
+					for r in rIndices:
+						for s in sIndices:
+							Ypqrs = 0.0
+							# MF Case
+							Ypqrs = self.CalcExpValue(SymbolsS2[n], SymbolsE2[n], NormalOrder1 + ['p', 'r', 's', 'q'], ProjectorOrbitalList + [p, q, r, s])
+							for t in tIndices:
+								for u in uIndices:
+									for v in vIndices:
+										for w in wIndices:
+											ExpR = self.CalcExpValue(SymbolsS2[n], SymbolsE2[n], NormalOrder1 + ['p', 'r', 's', 'q', 'v', 'w', 'u', 't'], ProjectorOrbitalList + [p, r, s, q, v, w, u, t])
+											ExpL = self.CalcExpValue(SymbolsS2[n], SymbolsE2[n], ['t', 'u', 'w', 'v'] + NormalOrder1 + ['p', 'r', 's', 'q'], [t, u, w, v] + ProjectorOrbitalList + [p, r, s, q])
+											Ypqrs += self.t[t, u, v, w] * (ExpR + ExpL)
+							Ypqrs *= self.V[p, q, r, s]
+							YElement += Ypqrs
+		return YElement
+
+	def CalcY(self):
+		NS = len(self.SIndex)
+		DimY = 1 + NS * NS + NS * NS * NS * NS
+		Y = np.zeros((DimY, 1))
+		Y[0, 0] = CalcYElements([])
+		for i in self.SIndex:
+			for j in self.SIndex:
+				ij = self.CombinedIndex([i, j])
+				Y[ij, 0] = CalcYElement([i, i, j, j])
+				for k in self.SIndex:
+					for l in self.SIndex:
+						ijkl = self.CombinedIndex([i, j, k, l])
+						Y[ijkl, 0] = CalcYElement([i, i, j, j, k, k, l, l])
+		return Y
 
 if __name__ == '__main__':
 	#CrA, AnA, CrB, AnB = SeparateOperatorIndices([0, 2, 4], [1, 3, 7], [5], [6])
