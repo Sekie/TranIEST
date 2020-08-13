@@ -197,13 +197,12 @@ def CalcWickTerms(Contractions, PorQ, Signs, P, Q):
 
 
 class MP2Bath:
-	def __init__(self, t, FIndex, BIndex, EIndex, PS, PE, h, V):
+	def __init__(self, t, SIndex, EIndex, PS, PE, h, V):
 		self.t = t
-		self.FIndex = FIndex
-		self.BIndex = BIndex
-		self.SIndex = FIndex + BIndex
+		#self.FIndex = FIndex
+		#self.BIndex = BIndex
+		self.SIndex = SIndex #FIndex + BIndex
 		self.EIndex = EIndex
-		self.AllIndex = self.SIndex + EIndex
 		self.PS = PS
 		self.PE = PE
 		self.QS = np.eye(PS.shape[0]) - PS
@@ -261,13 +260,13 @@ class MP2Bath:
 		return rIndices, sIndices
 
 	def CalcExpValue(self, SymbolS, SymbolE, NormalOrder, OrbitalList):
-		PosS, PosE = CaseToOperatorPosition(SymbolS, SymbolE, NormalOrder)
+		PosS, PosE = CaseToOperatorPositions(SymbolS, SymbolE, NormalOrder)
 		Sign = SignOfSeparation(PosE[0] + PosE[1])
 		ConS, PorQS, SignsS = WickContraction(PosS[0], PosS[1], OrbList = OrbitalList)
 		ConE, PorQE, SignsE = WickContraction(PosE[0], PosE[1], OrbList = OrbitalList)
 		ExpS = CalcWickTerms(ConS, PorQS, SignsS, self.PS, self.QS)
 		ExpE = CalcWickTerms(ConE, PorQE, SignsE, self.PE, self.QE)
-		return float(sign) * ExpS * ExpE
+		return float(Sign) * ExpS * ExpE
 
 	def CombinedIndex(self, Indices):
 		i = 0
@@ -291,7 +290,7 @@ class MP2Bath:
 		for n in range(len(SymbolsS)):
 			if Case == 'MF':
 				ExpSE = self.CalcExpValue(SymbolsS[n], SymbolsE[n], NormalOrder, OrbitalListNoT)
-				A += ExpSE
+				AElement += ExpSE
 				continue
 			tIndices, uIndices, vIndices, wIndices = self.GetAmplitudeIndices(SymbolsS[n])
 			for t in tIndices:
@@ -305,8 +304,8 @@ class MP2Bath:
 								OrbitalList = [t, u, w, v] + OrbitalList
 							assert len(OrbitalList) == len(NormalOrder)
 							ExpSE = self.CalcExpValue(SymbolsS[n], SymbolsE[n], NormalOrder, OrbitalList)
-							A += self.t[t, u, v, w] * ExpSE
-		return A
+							AElement += self.t[t, u, v, w] * ExpSE
+		return AElement
 
 	def CalcA(self):
 		NS = len(self.SIndex)
@@ -320,38 +319,38 @@ class MP2Bath:
 		for p in self.SIndex:
 			for q in self.SIndex:
 				pq = self.CombinedIndex([p, q])
-				A[0, pq] =  CalcAElements(['p'], ['q'], ['p', 'q'], [p, q], FixedCrS = ['p'], FixedAnS = ['q'], Case = 'MF')
-				A[0, pq] += CalcAElements(['p', 'v', 'w'], ['q', 'u', 't'], ['p', 'q', 'v', 'w', 'u', 't'], [p, q], FixedCrS = ['p'], FixedAnS = ['q'], Case = 'Right')
-				A[0, pq] += CalcAElements(['p', 't', 'u'], ['q', 'v', 'w'], ['t', 'u', 'w', 'v', 'p', 'q'], [p, q], FixedCrS = ['p'], FixedAnS = ['q'], Case = 'Left')
+				A[0, pq] = self.CalcAElements(['p'], ['q'], ['p', 'q'], [p, q], FixedCrS = ['p'], FixedAnS = ['q'], Case = 'MF')
+				A[0, pq] += self.CalcAElements(['p', 'v', 'w'], ['q', 'u', 't'], ['p', 'q', 'v', 'w', 'u', 't'], [p, q], FixedCrS = ['p'], FixedAnS = ['q'], Case = 'Right')
+				A[0, pq] += self.CalcAElements(['p', 't', 'u'], ['q', 'v', 'w'], ['t', 'u', 'w', 'v', 'p', 'q'], [p, q], FixedCrS = ['p'], FixedAnS = ['q'], Case = 'Left')
 				# pqrs - Case 2
 				for r in self.SIndex:
 					for s in self.SIndex:
 						pqrs = self.CombinedIndex([p, q, r, s])
-						A[0, pqrs] = CalcAElements(['p', 'r'], ['s', 'q'], ['p', 'r', 's', 'q'], [p, r, s, q], FixedCrS = ['p', 'r'], FixedAnS = ['s', 'q'], Case = 'MF')
-						A[0, pqrs] += CalcAElements(['p', 'r', 'v', 'w'], ['s', 'q', 'u', 't'], ['p', 'r', 's', 'q', 'v', 'w', 'u', 't'], [p, r, s, q], FixedCrS = ['p', 'r'], FixedAnS = ['s', 'q'], Case = 'Right')
-						A[0, pqrs] += CalcAElements(['p', 'r', 't', 'u'], ['s', 'q', 'v', 'w'], ['t', 'u', 'w', 'v', 'p', 'r', 's', 'q'], [p, r, s, q], FixedCrS = ['p', 'r'], FixedAnS = ['s', 'q'], Case = 'Left')
+						A[0, pqrs] = self.CalcAElements(['p', 'r'], ['s', 'q'], ['p', 'r', 's', 'q'], [p, r, s, q], FixedCrS = ['p', 'r'], FixedAnS = ['s', 'q'], Case = 'MF')
+						A[0, pqrs] += self.CalcAElements(['p', 'r', 'v', 'w'], ['s', 'q', 'u', 't'], ['p', 'r', 's', 'q', 'v', 'w', 'u', 't'], [p, r, s, q], FixedCrS = ['p', 'r'], FixedAnS = ['s', 'q'], Case = 'Right')
+						A[0, pqrs] += self.CalcAElements(['p', 'r', 't', 'u'], ['s', 'q', 'v', 'w'], ['t', 'u', 'w', 'v', 'p', 'r', 's', 'q'], [p, r, s, q], FixedCrS = ['p', 'r'], FixedAnS = ['s', 'q'], Case = 'Left')
 		# ijkl - Case 1
 		for i in self.SIndex:
 			for j in self.SIndex:
 				ij = CombinedIndex([i, j])
 				# pqrs - Case 0
-				A[ij, 0] = CalcAElements(['id', 'jd'], ['i', 'j'], ['id', 'i', 'jd', 'j'], [i, i, j, j], FixedCrS = ['id', 'jd'], FixedAnS = ['i', 'j'], Case = 'MF')
-				A[ij, 0] += CalcAElements(['id', 'jd', 'v', 'w'], ['i', 'j', 'u', 't'], ['id', 'i', 'jd', 'j', 'v', 'w', 'u', 't'], [i, i, j, j], FixedCrS = ['id', 'jd'], FixedAnS = ['i', 'j'], Case = 'Right')
-				A[ij, 0] += CalcAElements(['t', 'u', 'id', 'jd'], ['w', 'v', 'i', 'j'], ['t', 'u', 'w', 'v', 'id', 'i', 'jd', 'j'], [i, i, j, j], FixedCrS = ['id', 'jd'], FixedAnS = ['i', 'j'], Case = 'Left')
+				A[ij, 0] = self.CalcAElements(['id', 'jd'], ['i', 'j'], ['id', 'i', 'jd', 'j'], [i, i, j, j], FixedCrS = ['id', 'jd'], FixedAnS = ['i', 'j'], Case = 'MF')
+				A[ij, 0] += self.CalcAElements(['id', 'jd', 'v', 'w'], ['i', 'j', 'u', 't'], ['id', 'i', 'jd', 'j', 'v', 'w', 'u', 't'], [i, i, j, j], FixedCrS = ['id', 'jd'], FixedAnS = ['i', 'j'], Case = 'Right')
+				A[ij, 0] += self.CalcAElements(['t', 'u', 'id', 'jd'], ['w', 'v', 'i', 'j'], ['t', 'u', 'w', 'v', 'id', 'i', 'jd', 'j'], [i, i, j, j], FixedCrS = ['id', 'jd'], FixedAnS = ['i', 'j'], Case = 'Left')
 				# pqrs - Case 1
 				for p in self.SIndex:
 					for q in self.SIndex:
 						pq = CombinedIndex([p, q])
-						A[ij, pq] = CalcAElements(['id', 'jd', 'p'], ['i', 'j', 'q'], ['id', 'i', 'jd', 'j', 'p', 'q'], [i, i, j, j, p, q], FixedCrS = ['id', 'jd', 'p'], FixedAnS = ['i', 'j', 'q'], Case = 'MF')
-						A[ij, pq] += CalcAElements(['id', 'jd', 'p', 'v', 'w'], ['i', 'j', 'q', 'u', 't'], ['id', 'i', 'jd', 'j', 'p', 'q', 'v', 'w', 'u', 't'], [i, i, j, j, p, q], FixedCrS = ['id', 'jd', 'p'], FixedAnS = ['i', 'j', 'q'], Case = 'Right')
-						A[ij, pq] += CalcAElements(['t', 'u', 'id', 'jd', 'p'], ['w', 'v', 'i', 'j', 'q'], ['t', 'u', 'w', 'v', 'id', 'i', 'jd', 'j', 'p', 'q'], [i, i, j, j, p, q], FixedCrS = ['id', 'jd', 'p'], FixedAnS = ['i', 'j', 'q'], Case = 'Left')
+						A[ij, pq] = self.CalcAElements(['id', 'jd', 'p'], ['i', 'j', 'q'], ['id', 'i', 'jd', 'j', 'p', 'q'], [i, i, j, j, p, q], FixedCrS = ['id', 'jd', 'p'], FixedAnS = ['i', 'j', 'q'], Case = 'MF')
+						A[ij, pq] += self.CalcAElements(['id', 'jd', 'p', 'v', 'w'], ['i', 'j', 'q', 'u', 't'], ['id', 'i', 'jd', 'j', 'p', 'q', 'v', 'w', 'u', 't'], [i, i, j, j, p, q], FixedCrS = ['id', 'jd', 'p'], FixedAnS = ['i', 'j', 'q'], Case = 'Right')
+						A[ij, pq] += self.CalcAElements(['t', 'u', 'id', 'jd', 'p'], ['w', 'v', 'i', 'j', 'q'], ['t', 'u', 'w', 'v', 'id', 'i', 'jd', 'j', 'p', 'q'], [i, i, j, j, p, q], FixedCrS = ['id', 'jd', 'p'], FixedAnS = ['i', 'j', 'q'], Case = 'Left')
 						# pqrs - Case 2
 						for r in self.SIndex:
 							for s in self.SIndex:
 								pqrs = self.CombinedIndex([p, q, r, s])
-								A[ij, pqrs] = CalcAElements(['id', 'jd', 'p', 'r'], ['i', 'j', 's', 'q'], ['id', 'i', 'jd', 'j', 'p', 'r', 's', 'q'], [i, i, j, j, p, r, s, q], FixedCrS = ['id', 'jd', 'p', 'r'], FixedAnS = ['i', 'j', 's', 'q'], Case = 'MF')
-								A[ij, pqrs] += CalcAElements(['id', 'jd', 'p', 'r', 'v', 'w'], ['i', 'j', 's', 'q', 'u', 't'], ['id', 'i', 'jd', 'j', 'p', 'r', 's', 'q', 'v', 'w', 'u', 't'], [i, i, j, j, p, r, s, q], FixedCrS = ['id', 'jd', 'p', 'r'], FixedAnS = ['i', 'j', 's', 'q'], Case = 'Right')
-								A[ij, pqrs] += CalcAElements(['t', 'u', 'id', 'jd', 'p', 'r'], ['w', 'v', 'i', 'j', 's', 'q'], ['t', 'u', 'w', 'v', 'id', 'i', 'jd', 'j', 'p', 'r', 's', 'q'], [i, i, j, j, p, r, s, q], FixedCrS = ['id', 'jd', 'p', 'r'], FixedAnS = ['i', 'j', 's', 'q'], Case = 'Left')
+								A[ij, pqrs] = self.CalcAElements(['id', 'jd', 'p', 'r'], ['i', 'j', 's', 'q'], ['id', 'i', 'jd', 'j', 'p', 'r', 's', 'q'], [i, i, j, j, p, r, s, q], FixedCrS = ['id', 'jd', 'p', 'r'], FixedAnS = ['i', 'j', 's', 'q'], Case = 'MF')
+								A[ij, pqrs] += self.CalcAElements(['id', 'jd', 'p', 'r', 'v', 'w'], ['i', 'j', 's', 'q', 'u', 't'], ['id', 'i', 'jd', 'j', 'p', 'r', 's', 'q', 'v', 'w', 'u', 't'], [i, i, j, j, p, r, s, q], FixedCrS = ['id', 'jd', 'p', 'r'], FixedAnS = ['i', 'j', 's', 'q'], Case = 'Right')
+								A[ij, pqrs] += self.CalcAElements(['t', 'u', 'id', 'jd', 'p', 'r'], ['w', 'v', 'i', 'j', 's', 'q'], ['t', 'u', 'w', 'v', 'id', 'i', 'jd', 'j', 'p', 'r', 's', 'q'], [i, i, j, j, p, r, s, q], FixedCrS = ['id', 'jd', 'p', 'r'], FixedAnS = ['i', 'j', 's', 'q'], Case = 'Left')
 		#ijkl - Case 2
 		for i in self.SIndex:
 			for j in self.SIndex:
@@ -359,23 +358,23 @@ class MP2Bath:
 					for l in self.SIndex:
 						ijkl = self.CombinedIndex([i, j, k, l])
 						# pqrs - Case 0
-						A[ijkl, 0] = CalcAElements(['id', 'jd', 'kd', 'ld'], ['i', 'j', 'k', 'l'], ['id', 'i', 'jd', 'j', 'kd', 'k', 'ld', 'l'], [i, i, j, j, k, k, l, l], FixedCrS = ['id', 'jd', 'kd', 'ld'], FixedAnS = ['i', 'j', 'k', 'l'], Case = 'MF')
-						A[ijkl, 0] += CalcAElements(['id', 'jd', 'kd', 'ld', 'v', 'w'], ['i', 'j', 'k', 'l', 'u', 't'], ['id', 'i', 'jd', 'j', 'kd', 'k', 'ld', 'l', 'v', 'w', 'u', 't'], [i, i, j, j, k, k, l, l], FixedCrS = ['id', 'jd', 'kd', 'ld'], FixedAnS = ['i', 'j', 'k', 'l'], Case = 'Right')
-						A[ijkl, 0] += CalcAElements(['t', 'u', 'id', 'jd', 'kd', 'ld'], ['w', 'v', 'i', 'j', 'k', 'l'], ['t', 'u', 'w', 'v', 'id', 'i', 'jd', 'j', 'kd', 'k', 'ld', 'l'], [i, i, j, j, k, k, l, l], FixedCrS = ['id', 'jd', 'kd', 'ld'], FixedAnS = ['i', 'j', 'k', 'l'], Case = 'Left')
+						A[ijkl, 0] = self.CalcAElements(['id', 'jd', 'kd', 'ld'], ['i', 'j', 'k', 'l'], ['id', 'i', 'jd', 'j', 'kd', 'k', 'ld', 'l'], [i, i, j, j, k, k, l, l], FixedCrS = ['id', 'jd', 'kd', 'ld'], FixedAnS = ['i', 'j', 'k', 'l'], Case = 'MF')
+						A[ijkl, 0] += self.CalcAElements(['id', 'jd', 'kd', 'ld', 'v', 'w'], ['i', 'j', 'k', 'l', 'u', 't'], ['id', 'i', 'jd', 'j', 'kd', 'k', 'ld', 'l', 'v', 'w', 'u', 't'], [i, i, j, j, k, k, l, l], FixedCrS = ['id', 'jd', 'kd', 'ld'], FixedAnS = ['i', 'j', 'k', 'l'], Case = 'Right')
+						A[ijkl, 0] += self.CalcAElements(['t', 'u', 'id', 'jd', 'kd', 'ld'], ['w', 'v', 'i', 'j', 'k', 'l'], ['t', 'u', 'w', 'v', 'id', 'i', 'jd', 'j', 'kd', 'k', 'ld', 'l'], [i, i, j, j, k, k, l, l], FixedCrS = ['id', 'jd', 'kd', 'ld'], FixedAnS = ['i', 'j', 'k', 'l'], Case = 'Left')
 						# pqrs - Case 1
 						for p in self.SIndex:
 							for q in self.SIndex:
 								pq = self.CombinedIndex([p, q])
-								A[ijkl, pq] = CalcAElements(['id', 'jd', 'kd', 'ld', 'p'], ['i', 'j', 'k', 'l', 'q'], ['id', 'i', 'jd', 'j', 'kd', 'k', 'ld', 'l', 'p', 'q'], [i, i, j, j, k, k, l, l, p, q], FixedCrS = ['id', 'jd', 'kd', 'ld', 'p'], FixedAnS = ['i', 'j', 'k', 'l', 'q'], Case = 'MF')
-								A[ijkl, pq] += CalcAElements(['id', 'jd', 'kd', 'ld', 'p', 'v', 'w'], ['i', 'j', 'k', 'l', 'q', 'u', 't'], ['id', 'i', 'jd', 'j', 'kd', 'k', 'ld', 'l', 'p', 'q', 'v', 'w', 'u', 't'], [i, i, j, j, k, k, l, l, p, q], FixedCrS = ['id', 'jd', 'kd', 'ld', 'p'], FixedAnS = ['i', 'j', 'k', 'l', 'q'], Case = 'Right')
-								A[ijkl, pq] += CalcAElements(['t', 'u', 'id', 'jd', 'kd', 'ld', 'p'], ['w', 'v', 'i', 'j', 'k', 'l', 'q'], ['t', 'u', 'w', 'v', 'id', 'i', 'jd', 'j', 'kd', 'k', 'ld', 'l', 'p', 'q'], [i, i, j, j, k, k, l, l, p, q], FixedCrS = ['id', 'jd', 'kd', 'ld', 'p'], FixedAnS = ['i', 'j', 'k', 'l', 'q'], Case = 'Left')
+								A[ijkl, pq] = self.CalcAElements(['id', 'jd', 'kd', 'ld', 'p'], ['i', 'j', 'k', 'l', 'q'], ['id', 'i', 'jd', 'j', 'kd', 'k', 'ld', 'l', 'p', 'q'], [i, i, j, j, k, k, l, l, p, q], FixedCrS = ['id', 'jd', 'kd', 'ld', 'p'], FixedAnS = ['i', 'j', 'k', 'l', 'q'], Case = 'MF')
+								A[ijkl, pq] += self.CalcAElements(['id', 'jd', 'kd', 'ld', 'p', 'v', 'w'], ['i', 'j', 'k', 'l', 'q', 'u', 't'], ['id', 'i', 'jd', 'j', 'kd', 'k', 'ld', 'l', 'p', 'q', 'v', 'w', 'u', 't'], [i, i, j, j, k, k, l, l, p, q], FixedCrS = ['id', 'jd', 'kd', 'ld', 'p'], FixedAnS = ['i', 'j', 'k', 'l', 'q'], Case = 'Right')
+								A[ijkl, pq] += self.CalcAElements(['t', 'u', 'id', 'jd', 'kd', 'ld', 'p'], ['w', 'v', 'i', 'j', 'k', 'l', 'q'], ['t', 'u', 'w', 'v', 'id', 'i', 'jd', 'j', 'kd', 'k', 'ld', 'l', 'p', 'q'], [i, i, j, j, k, k, l, l, p, q], FixedCrS = ['id', 'jd', 'kd', 'ld', 'p'], FixedAnS = ['i', 'j', 'k', 'l', 'q'], Case = 'Left')
 								# pqrs - Case 2
 								for r in self.SIndex:
 									for s in self.SIndex:	
 										pqrs = self.CombinedIndex([p, q, r, s])
-										A[ijkl, pqrs] = CalcAElements(['id', 'jd', 'kd', 'ld', 'p', 'r'], ['i', 'j', 'k', 'l', 's', 'q'], ['id', 'i', 'jd', 'j', 'kd', 'k', 'ld', 'l', 'p', 'r', 's', 'q'], [i, i, j, j, k, k, l, l, p, r, s, q], FixedCrS = ['id', 'jd', 'kd', 'ld', 'p', 'r'], FixedAnS = ['i', 'j', 'k', 'l', 's', 'q'], Case = 'MF')
-										A[ijkl, pq] += CalcAElements(['id', 'jd', 'kd', 'ld', 'p', 'r', 'v', 'w'], ['i', 'j', 'k', 'l', 's', 'q', 'u', 't'], ['id', 'i', 'jd', 'j', 'kd', 'k', 'ld', 'l', 'p', 'r', 's', 'q', 'v', 'w', 'u', 't'], [i, i, j, j, k, k, l, l, p, r, s, q], FixedCrS = ['id', 'jd', 'kd', 'ld', 'p', 'r'], FixedAnS = ['i', 'j', 'k', 'l', 's', 'q'], Case = 'Right')
-										A[ijkl, pq] += CalcAElements(['t', 'u', 'id', 'jd', 'kd', 'ld', 'p', 'r'], ['w', 'v', 'i', 'j', 'k', 'l', 's', 'q'], ['t', 'u', 'w', 'v', 'id', 'i', 'jd', 'j', 'kd', 'k', 'ld', 'l', 'p', 'r', 's', 'q'], [i, i, j, j, k, k, l, l, p, r, s, q], FixedCrS = ['id', 'jd', 'kd', 'ld', 'p', 'r'], FixedAnS = ['i', 'j', 'k', 'l', 's', 'q'], Case = 'Left')
+										A[ijkl, pqrs] = self.CalcAElements(['id', 'jd', 'kd', 'ld', 'p', 'r'], ['i', 'j', 'k', 'l', 's', 'q'], ['id', 'i', 'jd', 'j', 'kd', 'k', 'ld', 'l', 'p', 'r', 's', 'q'], [i, i, j, j, k, k, l, l, p, r, s, q], FixedCrS = ['id', 'jd', 'kd', 'ld', 'p', 'r'], FixedAnS = ['i', 'j', 'k', 'l', 's', 'q'], Case = 'MF')
+										A[ijkl, pq] += self.CalcAElements(['id', 'jd', 'kd', 'ld', 'p', 'r', 'v', 'w'], ['i', 'j', 'k', 'l', 's', 'q', 'u', 't'], ['id', 'i', 'jd', 'j', 'kd', 'k', 'ld', 'l', 'p', 'r', 's', 'q', 'v', 'w', 'u', 't'], [i, i, j, j, k, k, l, l, p, r, s, q], FixedCrS = ['id', 'jd', 'kd', 'ld', 'p', 'r'], FixedAnS = ['i', 'j', 'k', 'l', 's', 'q'], Case = 'Right')
+										A[ijkl, pq] += self.CalcAElements(['t', 'u', 'id', 'jd', 'kd', 'ld', 'p', 'r'], ['w', 'v', 'i', 'j', 'k', 'l', 's', 'q'], ['t', 'u', 'w', 'v', 'id', 'i', 'jd', 'j', 'kd', 'k', 'ld', 'l', 'p', 'r', 's', 'q'], [i, i, j, j, k, k, l, l, p, r, s, q], FixedCrS = ['id', 'jd', 'kd', 'ld', 'p', 'r'], FixedAnS = ['i', 'j', 'k', 'l', 's', 'q'], Case = 'Left')
 		return A
 
 	def CalcYElements(self, ProjectorOrbitalList):
@@ -438,15 +437,15 @@ class MP2Bath:
 		NS = len(self.SIndex)
 		DimY = 1 + NS * NS + NS * NS * NS * NS
 		Y = np.zeros((DimY))
-		Y[0] = CalcYElements([])
+		Y[0] = self.CalcYElements([])
 		for i in self.SIndex:
 			for j in self.SIndex:
 				ij = self.CombinedIndex([i, j])
-				Y[ij] = CalcYElement([i, i, j, j])
+				Y[ij] = self.CalcYElement([i, i, j, j])
 				for k in self.SIndex:
 					for l in self.SIndex:
 						ijkl = self.CombinedIndex([i, j, k, l])
-						Y[ijkl] = CalcYElement([i, i, j, j, k, k, l, l])
+						Y[ijkl] = self.CalcYElement([i, i, j, j, k, k, l, l])
 		return Y
 
 	def CalcH(self):
@@ -497,7 +496,7 @@ if __name__ == '__main__':
 	#print(SignsS)
 
 	from functools import reduce
-	from pyscf import gto, scf, mp, lo
+	from pyscf import gto, scf, mp, lo, ao2mo
 	from frankenstein.tools.tensor_utils import get_symm_mat_pow
 	N = 10
 	r = 1.0
@@ -541,6 +540,11 @@ if __name__ == '__main__':
 	print(PSch)
 	print(PEnv)
 
+	TTotal = np.dot(StoOrth, T)
+	hSO = reduce(np.dot, (TTotal.T, mf.get_hcore(), TTotal))
+	VSO = ao2mo.kernel(mol, TTotal)
+	VSO = ao2mo.restore(1, VSO, hSO.shape[0])
+
 	mp2 = mp.MP2(mf)
 	E, t2 = mp2.kernel()
 
@@ -549,9 +553,12 @@ if __name__ == '__main__':
 	Norb = Nocc + Nvir
 	tMO = np.zeros((Norb, Norb, Norb, Norb))
 	tMO[:Nocc, :Nocc, Nocc:, Nocc:] = t2
-	print(t2[0, 0, 0, 0])
-	print(tMO[0, 0, 5, 5])
 
-	tLO = np.einsum('ia,jb,kc,ld,ijkl->abcd', StoOrth, StoOrth, StoOrth, StoOrth, tMO)
-	tSO = np.einsum('ap,bq,cr,ds,abcd->pqrs', T, T, T, T, tLO)
-	print(tSO)
+	#tLO = np.einsum('ia,jb,kc,ld,ijkl->abcd', StoOrth, StoOrth, StoOrth, StoOrth, tMO)
+	#tSO = np.einsum('ap,bq,cr,ds,abcd->pqrs', T, T, T, T, tLO)
+	tSO = np.einsum('ap,bq,cr,ds,abcd->pqrs', TTotal, TTotal, TTotal, TTotal, tMO)
+
+	SIndex = list(range(PSch.shape[0]))
+	EIndex = list(range(PEnv.shape[0]))
+	myMP2Bath = MP2Bath(tSO, SIndex, EIndex, PSch, PEnv, hSO, VSO)
+	myMP2Bath.CalcH()
