@@ -63,6 +63,15 @@ def WickContraction(CrIdx, AnIdx, OrbList = None):
 
 	return Contractions, PorQ, Signs
 
+def ContractionIndexToOrbitals(Contractions, OrbList):
+	OrbContractions = []
+	for Contraction in Contractions:
+		OrbContraction = []
+		for Pair in Contraction:
+			OrbContraction.append((OrbList[Pair[0]], OrbList[Pair[1]]))
+		OrbContractions.append(OrbContraction)
+	return OrbContractions	
+
 if __name__ == "__main__":
 	OrbCons, PQ, Signs = WickContraction([0, 1], [2, 3])
 	print(OrbCons)
