@@ -483,15 +483,75 @@ if __name__ == '__main__':
 	#	print(IB[i])
 
 
-	IndexS = [['p'], ['q']]
-	IndexE = [['r'], ['s']]
-	NormalOrder = ['p', 'r', 's', 'q']
-	NormalOrderOrb = [1, 2, 3, 4]
-	PositionS, PositionE = CaseToOperatorPositions(IndexS, IndexE, NormalOrder, NormalOrderOrb)
-	print(PositionS)
-	print(PositionE)
-	Sign = SignOfSeparation(PositionE[0] + PositionE[1])
-	ContractionsS, PorQS, SignsS = WickContraction(PositionS[0], PositionS[1], OrbList = NormalOrderOrb)
-	print(ContractionsS)
-	print(PorQS)
-	print(SignsS)
+	#IndexS = [['p'], ['q']]
+	#IndexE = [['r'], ['s']]
+	#NormalOrder = ['p', 'r', 's', 'q']
+	#NormalOrderOrb = [1, 2, 3, 4]
+	#PositionS, PositionE = CaseToOperatorPositions(IndexS, IndexE, NormalOrder, NormalOrderOrb)
+	#print(PositionS)
+	#print(PositionE)
+	#Sign = SignOfSeparation(PositionE[0] + PositionE[1])
+	#ContractionsS, PorQS, SignsS = WickContraction(PositionS[0], PositionS[1], OrbList = NormalOrderOrb)
+	#print(ContractionsS)
+	#print(PorQS)
+	#print(SignsS)
+
+	from functools import reduce
+	from pyscf import gto, scf, mp, lo
+	from frankenstein.tools.tensor_utils import get_symm_mat_pow
+	N = 10
+	r = 1.0
+	mol = gto.Mole()
+	mol.atom = []
+	for i in range(N):
+		angle = i / N * 2.0 * np.pi
+		mol.atom.append(('H', (r * np.sin(angle), r * np.cos(angle), 0)))
+	mol.basis = 'sto-3g'
+	mol.build(verbose = 0)
+	mf = scf.RHF(mol).run()
+	
+	S = mol.intor_symmetric("int1e_ovlp")
+	mo_coeff = mf.mo_coeff
+	StoOrth = get_symm_mat_pow(S, 0.50)
+	StoOrig = get_symm_mat_pow(S, -0.5)
+	mo_occ = mo_coeff[:, :5]
+	mo_occ = np.dot(StoOrth.T, mo_occ)
+	P = np.dot(mo_occ, mo_occ.T)
+	Nf = 1
+	PFrag = P[:Nf, :Nf]
+	PEnvBath = P[Nf:, Nf:]
+	eEnv, vEnv = np.linalg.eigh(PEnvBath)
+	thresh = 1.e-9
+	BathOrbs = [i for i, v in enumerate(eEnv) if v > thresh and v < 1.0 - thresh]
+	EnvOrbs  = [i for i, v in enumerate(eEnv) if v < thresh or v > 1.0 - thresh]
+	TBath = vEnv[:,BathOrbs]
+	TBath = np.concatenate((np.zeros((Nf, TBath.shape[1])), TBath))
+	TEnv  = vEnv[:,EnvOrbs]
+	TEnv  = np.concatenate((np.zeros((Nf, TEnv.shape[1])), TEnv))
+	TFrag = np.eye(TBath.shape[0], Nf)
+	TSch = np.concatenate((TFrag, TBath), axis = 1)
+	T = np.concatenate((TSch, TEnv), axis = 1)
+	BathOrbs = [x + Nf for x in BathOrbs]
+	SchOrbs = [0] + BathOrbs
+	EnvOrbs = [x + Nf for x in EnvOrbs]
+	PEnv = reduce(np.dot, (TEnv.T, P, TEnv))
+	PSch = reduce(np.dot, (TSch.T, P, TSch))
+	PEnv[PEnv < thresh] = 0.0
+	PEnv[PEnv > 1.0 - thresh] = 1.0
+	print(PSch)
+	print(PEnv)
+
+	mp2 = mp.MP2(mf)
+	E, t2 = mp2.kernel()
+
+	Nocc = t2.shape[0]
+	Nvir = t2.shape[2]
+	Norb = Nocc + Nvir
+	tMO = np.zeros((Norb, Norb, Norb, Norb))
+	tMO[:Nocc, :Nocc, Nocc:, Nocc:] = t2
+	print(t2[0, 0, 0, 0])
+	print(tMO[0, 0, 5, 5])
+
+	tLO = np.einsum('ia,jb,kc,ld,ijkl->abcd', StoOrth, StoOrth, StoOrth, StoOrth, tMO)
+	tSO = np.einsum('ap,bq,cr,ds,abcd->pqrs', T, T, T, T, tLO)
+	print(tSO)
