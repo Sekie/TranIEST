@@ -11,7 +11,6 @@ def SignOfSeparation(Indices):
 	IndicesSort = sorted(Indices)
 	List = list(range(len(IndicesSort)))
 	Moves = sum([ai - bi for ai, bi in zip(IndicesSort, List)])
-	print(Moves)
 	Sign = 1
 	if Moves % 2 == 1:
 		Sign = -1
@@ -215,19 +214,20 @@ class MP2Bath:
 		uIndices = [] 
 		vIndices = []
 		wIndices = []
-		if 't' in SymbolS[0]:
+		SymS = SymbolS[0] + SymbolS[1]
+		if 't' in SymS:
 			tIndices = self.SIndex
 		else:
 			tIndices = self.EIndex
-		if 'u' in SymbolS[0]:
+		if 'u' in SymS:
 			uIndices = self.SIndex
 		else:
 			uIndices = self.EIndex
-		if 'v' in SymbolS[1]:
+		if 'v' in SymS:
 			vIndices = self.SIndex
 		else:
 			vIndices = self.EIndex
-		if 'w' in SymbolS[1]:
+		if 'w' in SymS:
 			wIndices = self.SIndex
 		else:
 			wIndices = self.EIndex
@@ -236,11 +236,12 @@ class MP2Bath:
 	def GetPQIndices(self, SymbolS):
 		pIndices = []
 		qIndices = []
-		if 'p' in SymbolS[0]:
+		SymS = SymbolS[0] + SymbolS[1]
+		if 'p' in SymS:
 			pIndices = self.SIndex
 		else:
 			pIndices = self.EIndex
-		if 'q' in SymbolsS[0]:
+		if 'q' in SymS:
 			qIndices = self.SIndex
 		else:
 			qIndices = self.EIndex
@@ -249,11 +250,12 @@ class MP2Bath:
 	def GetRSIndices(self, SymbolS):
 		rIndices = []
 		sIndices = []
-		if 'r' in SymbolS[0]:
+		SymS = SymbolS[0] + SymbolS[1]
+		if 'r' in SymS:
 			rIndices = self.SIndex
 		else:
 			rIndices = self.EIndex
-		if 's' in SymbolS[0]:
+		if 's' in SymS:
 			sIndices = self.SIndex
 		else:
 			sIndices = self.EIndex
@@ -332,7 +334,7 @@ class MP2Bath:
 		# ijkl - Case 1
 		for i in self.SIndex:
 			for j in self.SIndex:
-				ij = CombinedIndex([i, j])
+				ij = self.CombinedIndex([i, j])
 				# pqrs - Case 0
 				A[ij, 0] = self.CalcAElements(['id', 'jd'], ['i', 'j'], ['id', 'i', 'jd', 'j'], [i, i, j, j], FixedCrS = ['id', 'jd'], FixedAnS = ['i', 'j'], Case = 'MF')
 				A[ij, 0] += self.CalcAElements(['id', 'jd', 'v', 'w'], ['i', 'j', 'u', 't'], ['id', 'i', 'jd', 'j', 'v', 'w', 'u', 't'], [i, i, j, j], FixedCrS = ['id', 'jd'], FixedAnS = ['i', 'j'], Case = 'Right')
@@ -340,7 +342,7 @@ class MP2Bath:
 				# pqrs - Case 1
 				for p in self.SIndex:
 					for q in self.SIndex:
-						pq = CombinedIndex([p, q])
+						pq = self.CombinedIndex([p, q])
 						A[ij, pq] = self.CalcAElements(['id', 'jd', 'p'], ['i', 'j', 'q'], ['id', 'i', 'jd', 'j', 'p', 'q'], [i, i, j, j, p, q], FixedCrS = ['id', 'jd', 'p'], FixedAnS = ['i', 'j', 'q'], Case = 'MF')
 						A[ij, pq] += self.CalcAElements(['id', 'jd', 'p', 'v', 'w'], ['i', 'j', 'q', 'u', 't'], ['id', 'i', 'jd', 'j', 'p', 'q', 'v', 'w', 'u', 't'], [i, i, j, j, p, q], FixedCrS = ['id', 'jd', 'p'], FixedAnS = ['i', 'j', 'q'], Case = 'Right')
 						A[ij, pq] += self.CalcAElements(['t', 'u', 'id', 'jd', 'p'], ['w', 'v', 'i', 'j', 'q'], ['t', 'u', 'w', 'v', 'id', 'i', 'jd', 'j', 'p', 'q'], [i, i, j, j, p, q], FixedCrS = ['id', 'jd', 'p'], FixedAnS = ['i', 'j', 'q'], Case = 'Left')
@@ -560,5 +562,16 @@ if __name__ == '__main__':
 
 	SIndex = list(range(PSch.shape[0]))
 	EIndex = list(range(PEnv.shape[0]))
+	
+	tZero = np.zeros((Norb, Norb, Norb, Norb))
+	testMFBath = MP2Bath(tZero, SIndex, EIndex, PSch, PEnv, hSO, VSO)
+	mf0, mf1, mf2 = testMFBath.CalcH()
+	mf0.tofile("mf0")
+	mf1.tofile("mf1")
+	mf2.tofile("mf2")
+
 	myMP2Bath = MP2Bath(tSO, SIndex, EIndex, PSch, PEnv, hSO, VSO)
-	myMP2Bath.CalcH()
+	H0, H1, H2 = myMP2Bath.CalcH()
+	H0.tofile("H0")
+	H1.tofile("H1")
+	H2.tofile("H2")
