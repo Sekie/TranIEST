@@ -184,6 +184,8 @@ def CaseToOperatorPositions(IndexS, IndexE, NormalOrder, NormalOrderOrbitals = N
 
 def CalcWickTerms(Contractions, PorQ, Signs, P, Q):
 		Value = 0.0
+		if len(Contractions) == 0:
+			return 1.0
 		for i in range(len(Signs)):
 			iValue = float(Signs[i])
 			for n in range(len(Contractions[i])):
@@ -424,7 +426,7 @@ class MP2Bath:
 			ConEL, PorQEL, SignsEL = WickContraction(PosEL[0], PosEL[1])
 
 			pIndices, qIndices = self.GetPQIndices(SymbolsS1[n])
-			tIndices, uIndices, vIndices, wIndices = GetAmplitudeIndices(SymbolsS1[n])
+			tIndices, uIndices, vIndices, wIndices = self.GetAmplitudeIndices(SymbolsS1[n])
 			for p in pIndices:
 				for q in qIndices:
 					Ypq = 0.0
@@ -479,8 +481,8 @@ class MP2Bath:
 			ConEL, PorQEL, SignsEL = WickContraction(PosEL[0], PosEL[1])
 
 			pIndices, qIndices = self.GetPQIndices(SymbolsS2[n])
-			rIndices, sIndices = self.getRSIndices(SymbolsS2[n])
-			tIndices, uIndices, vIndices, wIndices = GetAmplitudeIndices(SymbolsS2[n])
+			rIndices, sIndices = self.GetRSIndices(SymbolsS2[n])
+			tIndices, uIndices, vIndices, wIndices = self.GetAmplitudeIndices(SymbolsS2[n])
 			for p in pIndices:
 				for q in qIndices:
 					for r in rIndices:

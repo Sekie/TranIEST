@@ -24,6 +24,8 @@ def WickContraction(CrIdx, AnIdx, OrbList = None):
 	Contractions = []
 	PorQ = []
 	Signs = []
+	if len(CrIdx) == 0:
+		return Contractions, PorQ, Signs
 	
 	CrPermutations = itertools.permutations(CrIdx, len(AnIdx))
 	for each_permutation in CrPermutations:
