@@ -30,6 +30,8 @@ def WickContraction(CrIdx, AnIdx, OrbList = None):
 		zipped = zip(each_permutation, AnIdx)
 		Contractions.append(list(zipped))
 	for Contraction in Contractions:
+		if len(Contractions) == 1:
+			break
 		Matches = []
 		for Pair in Contraction:
 			if abs(Pair[0] - Pair[1]) == 1:

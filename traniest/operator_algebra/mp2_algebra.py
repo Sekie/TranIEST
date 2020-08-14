@@ -367,6 +367,7 @@ class MP2Bath:
 				for k in self.SIndex:
 					for l in self.SIndex:
 						ijkl = self.CombinedIndex([i, j, k, l])
+						print("doing ijkl", i, j, k, l)
 						# pqrs - Case 0
 						A[ijkl, 0] = self.CalcAElements(['id', 'jd', 'kd', 'ld'], ['i', 'j', 'k', 'l'], ['id', 'i', 'jd', 'j', 'kd', 'k', 'ld', 'l'], [i, i, j, j, k, k, l, l], FixedCrS = ['id', 'jd', 'kd', 'ld'], FixedAnS = ['i', 'j', 'k', 'l'], Case = 'MF')
 						A[ijkl, 0] += self.CalcAElements(['id', 'jd', 'kd', 'ld', 'v', 'w'], ['i', 'j', 'k', 'l', 'u', 't'], ['id', 'i', 'jd', 'j', 'kd', 'k', 'ld', 'l', 'v', 'w', 'u', 't'], [i, i, j, j, k, k, l, l], FixedCrS = ['id', 'jd', 'kd', 'ld'], FixedAnS = ['i', 'j', 'k', 'l'], Case = 'Right')
