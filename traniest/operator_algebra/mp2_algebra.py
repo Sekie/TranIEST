@@ -528,16 +528,16 @@ class MP2Bath:
 		for i in self.SIndex:
 			for j in self.SIndex:
 				ij = self.CombinedIndex([i, j])
-				Y[ij] = self.CalcYElement([i, i, j, j])
+				Y[ij] = self.CalcYElements([i, i, j, j])
 				for k in self.SIndex:
 					for l in self.SIndex:
 						ijkl = self.CombinedIndex([i, j, k, l])
-						Y[ijkl] = self.CalcYElement([i, i, j, j, k, k, l, l])
+						Y[ijkl] = self.CalcYElements([i, i, j, j, k, k, l, l])
 		return Y
 
 	def CalcH(self):
-		A = self.CalcA()
 		Y = self.CalcY()
+		A = self.CalcA()
 		H = np.linalg.solve(A, Y)
 		NS = len(self.SIndex)
 		H0 = 0.0
@@ -585,7 +585,8 @@ if __name__ == '__main__':
 	from functools import reduce
 	from pyscf import gto, scf, mp, lo, ao2mo
 	from frankenstein.tools.tensor_utils import get_symm_mat_pow
-	N = 10
+	N = 4
+	nocc = int(N / 2)
 	r = 1.0
 	mol = gto.Mole()
 	mol.atom = []
@@ -600,7 +601,7 @@ if __name__ == '__main__':
 	mo_coeff = mf.mo_coeff
 	StoOrth = get_symm_mat_pow(S, 0.50)
 	StoOrig = get_symm_mat_pow(S, -0.5)
-	mo_occ = mo_coeff[:, :5]
+	mo_occ = mo_coeff[:, :nocc]
 	mo_occ = np.dot(StoOrth.T, mo_occ)
 	P = np.dot(mo_occ, mo_occ.T)
 	Nf = 1
