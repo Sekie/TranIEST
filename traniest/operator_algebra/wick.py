@@ -34,13 +34,18 @@ def WickContraction(CrIdx, AnIdx, OrbList = None):
 	for Contraction in Contractions:
 		if len(Contractions) == 1:
 			break
-		Matches = []
+		doRemove = True
 		for Pair in Contraction:
-			if abs(Pair[0] - Pair[1]) == 1:
-				Matches.append(0)
-			else:
+			OtherPairs = Contraction.copy()
+			OtherPairs.remove(Pair)
+			for OtherPair in OtherPairs:
+				if (OtherPair[0] > min(Pair[0], Pair[1]) and OtherPair[0] < max(Pair[0], Pair[0])) or (OtherPair[1] > min(Pair[0], Pair[1]) and OtherPair[1] < max(Pair[0], Pair[1])):
+					doRemove = False
+				if not doRemove:
+					break
+			if not doRemove:
 				break
-		if len(Matches) == len(Contraction):
+		if doRemove:
 			Contractions.remove(Contraction)
 			break
 

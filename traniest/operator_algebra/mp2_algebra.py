@@ -193,7 +193,7 @@ def CalcWickTerms(Contractions, PorQ, Signs, P, Q):
 					iValue *= P[Contractions[i][n][0], Contractions[i][n][1]]
 				else:
 					iValue *= Q[Contractions[i][n][0], Contractions[i][n][1]]
-				Value += iValue
+			Value += iValue
 		return Value
 
 
@@ -649,12 +649,12 @@ if __name__ == '__main__':
 	SIndex = list(range(PSch.shape[0]))
 	EIndex = list(range(PEnv.shape[0]))
 	
-	tZero = np.zeros((Norb, Norb, Norb, Norb))
-	testMFBath = MP2Bath(tZero, SIndex, EIndex, PSch, PEnv, hSO, VSO)
-	mf0, mf1, mf2 = testMFBath.CalcH()
-	mf0.tofile("mf0")
-	mf1.tofile("mf1")
-	mf2.tofile("mf2")
+	#tZero = np.zeros((Norb, Norb, Norb, Norb))
+	#testMFBath = MP2Bath(tZero, SIndex, EIndex, PSch, PEnv, hSO, VSO)
+	#mf0, mf1, mf2 = testMFBath.CalcH()
+	#mf0.tofile("mf0")
+	#mf1.tofile("mf1")
+	#mf2.tofile("mf2")
 
 	myMP2Bath = MP2Bath(tSO, SIndex, EIndex, PSch, PEnv, hSO, VSO)
 	H0, H1, H2 = myMP2Bath.CalcH()
