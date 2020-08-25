@@ -342,10 +342,6 @@ class MP2Bath:
 						ExtraOrbitalLists2.append(ExtraOrbList2)
 						ExtraNormalOrders2.append(ExtraNormalOrder2)
 						RemovedSymbols2.append([TranslateToSymbols[2 * n], TranslateToSymbols[2 * n + 1], TranslateToSymbols[2 * (n + m + 1)], TranslateToSymbols[2 * (n + m + 1) + 1]])
-							SymbolsS2[nn][0].remove(TranslateToSymbols[2 * n])
-							SymbolsS2[nn][1].remove(TranslateToSymbols[2 * n + 1])
-							SymbolsS2[nn][0].remove(TranslateToSymbols[2 * (n + m + 1)])
-							SymbolsS2[nn][1].remove(TranslateToSymbols[2 * (n + m + 1) + 1])
 						if Containskl:
 							for o in range(len(ijklBath) - n - m - 1):
 								if ijklBath[n + m + o + 1] == 1:
