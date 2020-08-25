@@ -371,6 +371,60 @@ class MP2Bath:
 		for n in range(len(SymbolsS)):
 			if Case == 'MF':
 				ExpSE = self.CalcExpValue(SymbolsS[n], SymbolsE[n], NormalOrder, OrbitalListNoT)
+				ExpSE1 = []; ExpSE2 = []; ExpSE3 = []; ExpSE4 = [];
+				for a in range(len(ExtraNormalOrders1)):
+					SymS = SymbolsS[n].copy()
+					for x in RemovedSymbols1[a]:
+						if x in SymS[0]:
+							SymS[0].remove(x)
+						if x in SymS[1]:
+							SymS[1].remove(x)
+					aExpSE = self.CalcExpValue(SymS, SymbolsE[n], ExtraNormalOrders1[a], OrbitalListNoT)
+					ExpSE1.append(aExpSE)
+				for a in range(len(ExtraNormalOrders2)):
+					SymS = SymbolsS[n].copy()
+					for x in RemovedSymbols2[a]:
+						if x in SymS[0]:
+							SymS[0].remove(x)
+						if x in SymS[1]:
+							SymS[1].remove(x)
+					aExpSE = self.CalcExpValue(SymS, SymbolsE[n], ExtraNormalOrders2[a], OrbitalListNoT)
+					ExpSE2.append(aExpSE)
+				for a in range(len(ExtraNormalOrders3)):
+					SymS = SymbolsS[n].copy()
+					for x in RemovedSymbols3[a]:
+						if x in SymS[0]:
+							SymS[0].remove(x)
+						if x in SymS[1]:
+							SymS[1].remove(x)
+					aExpSE = self.CalcExpValue(SymS, SymbolsE[n], ExtraNormalOrders3[a], OrbitalListNoT)
+					ExpSE3.append(aExpSE)
+	
+				for a in range(len(ExtraNormalOrders4)):
+					SymS = SymbolsS[n].copy()
+					for x in RemovedSymbols4[a]:
+						if x in SymS[0]:
+							SymS[0].remove(x)
+						if x in SymS[1]:
+							SymS[1].remove(x)
+					aExpSE = self.CalcExpValue(SymS, SymbolsE[n], ExtraNormalOrders4[a], OrbitalListNoT)
+					ExpSE4.append(aExpSE)
+				if ijklBathNum == 1:
+					ExpSE = -1.0 * ExpSE
+				Parity1 = 1.0; Parity2 = 1.0; Parity3 = 1.0; Parity4 = 1.0
+				if ijkBathNum == 1:
+					Parity2 = -1.0; Parity4 = -1.0
+				else:
+					Parity1 = -1.0; Parity3 = -1.0
+				for a in ExpSE1:
+					ExpSE = ExpSE + Parity1 * a
+				for a in ExpSE2:
+					ExpSE = ExpSE + Parity2 * a
+				for a in ExpSE3:
+					ExpSE = ExpSE + Parity3 * a
+				for a in ExpSE4:
+					ExpSE = ExpSE + Parity4 * a
+			
 				AElement += ExpSE
 				continue
 			PosS, PosE = CaseToOperatorPositions(SymbolsS[n], SymbolsE[n], NormalOrder)
