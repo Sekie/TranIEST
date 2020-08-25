@@ -291,6 +291,9 @@ class MP2Bath:
 		SymbolsS, SymbolsE = GenerateSubspaceCases(CrSymbols, AnSymbols, FixedCrA = FixedCrS, FixedAnA = FixedAnS)
 		AElement = 0.0
 
+		if len(OrbitalListNoT) == 0 and Case == 'MF':
+			return 1.0
+
 		Containsij = ('i' in NormalOrder)
 		Containskl = ('k' in NormalOrder)
 		ijklBath = []
@@ -309,13 +312,19 @@ class MP2Bath:
 				ijklBath[n] = 1
 				OrbitalListNoT[2 * n] = ijkl[n] - len(self.SIndex)
 				OrbitalListNoT[2 * n + 1] = ijkl[n] - len(self.SIndex)
-		TranslateToSymbol = ['i', 'id', 'j', 'jd', 'k', 'kd', 'l', 'ld'] # Takes index to 2i and 2i+1 as symbols to remove
+		TranslateToSymbol = ['id', 'i', 'jd', 'j', 'kd', 'k', 'ld', 'l'] # Takes index to 2i and 2i+1 as symbols to remove
 		ExtraOrbitalLists1 = []
 		ExtraNormalOrders1 = []
 		ExtraOrbitalLists2 = []
 		ExtraNormalOrders2 = []
 		ExtraOrbitalLists3 = []
 		ExtraNormalOrders3 = []
+		ExtraOrbitalLists4 = []
+		ExtraNormalOrders4 = []
+		SymbolsS1 = SymbolsS.copy()
+		SymbolsS2 = SymbolsS.copy()
+		SymbolsS3 = SymbolsS.copy()
+		SymbolsS4 = SymbolsS.copy()
 		for n in range(len(ijklBath)):
 			if ijklBath[n] == 1:
 				ExtraOrbList1 = OrbitalListNoT.copy()
@@ -325,6 +334,9 @@ class MP2Bath:
 				ExtraNormalOrder1.remove(TranslateToSymbols[2 * n + 1])
 				ExtraOrbitalLists1.append(ExtraOrbList1)
 				ExtraNormalOrders1.append(ExtraNormalOrder1)
+				for nn in range(len(SymbolsS1)):
+					SymbolsS1[nn][0].remove(TranslateToSymbols[2 * n])
+					SymbolsS1[nn][1].remove(TranslateToSymbols[2 * n + 1])		
 				for m in range(len(ijklBath) - n - 1):
 					if ijklBath[n + m + 1] == 1:
 						ExtraOrbList2 = ExtraOrbList1.copy()
@@ -334,6 +346,11 @@ class MP2Bath:
 						ExtraNormalOrder2.remove(TranslateToSymbols[2 * (n + m + 1) + 1])
 						ExtraOrbitalLists2.append(ExtraOrbList2)
 						ExtraNormalOrders2.append(ExtraNormalOrder2)
+						for nn in range(len(SymbolsS2)):
+							SymbolsS2[nn][0].remove(TranslateToSymbols[2 * n])
+							SymbolsS2[nn][1].remove(TranslateToSymbols[2 * n + 1])
+							SymbolsS2[nn][0].remove(TranslateToSymbols[2 * (n + m + 1)])
+							SymbolsS2[nn][1].remove(TranslateToSymbols[2 * (n + m + 1) + 1])
 						if Containskl:
 							for o in range(len(ijklBath) - n - m - 1):
 								if ijklBath[n + m + o + 1] == 1:
@@ -344,12 +361,36 @@ class MP2Bath:
 									ExtraNormalOrder3.remove(TranslateToSymbols[2 * (n + m + o + 1) + 1])
 									ExtraOrbitalLists3.append(ExtraOrbList3)
 									ExtraNormalOrders3.append(ExtraNormalOrder3)
+									for nn in range(len(SymbolsS3)):
+										SymbolsS3[nn][0].remove(TranslateToSymbols[2 * n])
+										SymbolsS3[nn][1].remove(TranslateToSymbols[2 * n + 1])
+										SymbolsS3[nn][0].remove(TranslateToSymbols[2 * (n + m + 1)])
+										SymbolsS3[nn][1].remove(TranslateToSymbols[2 * (n + m + 1) + 1])
+										SymbolsS3[nn][0].remove(TranslateToSymbols[2 * (n + m + o + 1)])
+										SymbolsS3[nn][1].remove(TranslateToSymbols[2 * (n + m + o + 1) + 1])
+									for p in range(len(ijklBath) - n - m - o - 1):
+										if ijklBath[n + m + o + p + 1] == 1:
+											ExtraOrbList4 = ExtraOrbList3.copy()
+											del ExtraOrbList4[(2*p):(2*p+2)]
+											ExtraNormalOrder4 = ExtraNormalOrder3.copy()
+											ExtraNormalOrder4.remove(TranslateToSymbols[2 * (n + m + o + p + 1)])
+											ExtraNormalOrder4.remove(TranslateToSymbols[2 * (n + m + o + p + 1) + 1])
+											ExtraOrbitalLists4.append(ExtraOrbList4)
+											ExtraNormalOrders4.append(ExtraNormalOrder4)
+											for nn in range(len(SymbolsS4)):
+												SymbolsS4[nn][0].remove(TranslateToSymbols[2 * n])
+												SymbolsS4[nn][1].remove(TranslateToSymbols[2 * n + 1])
+												SymbolsS4[nn][0].remove(TranslateToSymbols[2 * (n + m + 1)])
+												SymbolsS4[nn][1].remove(TranslateToSymbols[2 * (n + m + 1) + 1])
+												SymbolsS4[nn][0].remove(TranslateToSymbols[2 * (n + m + o + 1)])
+												SymbolsS4[nn][1].remove(TranslateToSymbols[2 * (n + m + o + 1) + 1])
+												SymbolsS4[nn][0].remove(TranslateToSymbols[2 * (n + m + o + p + 1)])
+												SymbolsS4[nn][1].remove(TranslateToSymbols[2 * (n + m + o + p + 1) + 1])
+
 		ijklBathNum = 0
 		for x in ijklBath:
 			ijklBathNum = ijklBathNum + x
 
-		if len(OrbitalListNoT) == 0 and Case == 'MF':
-			return 1.0
 		for n in range(len(SymbolsS)):
 			if Case == 'MF':
 				ExpSE = self.CalcExpValue(SymbolsS[n], SymbolsE[n], NormalOrder, OrbitalListNoT)
@@ -359,6 +400,15 @@ class MP2Bath:
 			Sign = SignOfSeparation(PosE[0] + PosE[1])
 			ConS, PorQS, SignsS = WickContraction(PosS[0], PosS[1])
 			ConE, PorQE, SignsE = WickContraction(PosE[0], PosE[1])
+	
+			ConS1 = []; ConS2 = []; ConS3 = []; ConS4 = []
+			ConE1 = []; ConE2 = []; ConE3 = []; ConE4 = []
+			PorQS1 = []; PorQS2 = []; PorQS3 = []; PorQS4 = []
+			PorQE1 = []; PorQE2 = []; PorQE3 = []; PorQE4 = []
+			SignsS1 = []; SignsS2 = []; SignsS3 = []; SignsS4 = []
+			SignsE1 = []; SignsE2 = []; SignsE3 = []; SignsE4 = []
+			Sign1 = []; Sign2 = []; Sign3 = []; Sign4 = []
+			
 			tIndices, uIndices, vIndices, wIndices = self.GetAmplitudeIndices(SymbolsS[n])
 			for t in tIndices:
 				for u in uIndices:
