@@ -285,10 +285,69 @@ class MP2Bath:
 
 	'''
 	Calculates A for given indices ijkl, pqrs
+	For the cases where ijkl are in B, we assume that OrbitalListNoT is in the order [i, i, j, j, k, k, l, l, ...]
 	'''
 	def CalcAElements(self, CrSymbols, AnSymbols, NormalOrder, OrbitalListNoT, FixedCrS = None, FixedAnS = None, Case = 'MF'):
 		SymbolsS, SymbolsE = GenerateSubspaceCases(CrSymbols, AnSymbols, FixedCrA = FixedCrS, FixedAnA = FixedAnS)
 		AElement = 0.0
+
+		Containsij = ('i' in NormalOrder)
+		Containskl = ('k' in NormalOrder)
+		ijklBath = []
+		ijkl = []
+		if Containsij:
+			ijkl.append(OrbitalListNoT[0])
+			ijkl.append(OrbitalListNoT[2])
+			if Containskl:
+				ijkl.append(OrbitalList[4])
+				ijkl.append(OrbitalList[6])
+				ijklBath = [0, 0, 0, 0]
+			else:
+				ijklBath = [0, 0]
+		for n in range(len(ijklBath)):
+			if ijkl[n] in self.BIndex:
+				ijklBath[n] = 1
+				OrbitalListNoT[2 * n] = ijkl[n] - len(self.SIndex)
+				OrbitalListNoT[2 * n + 1] = ijkl[n] - len(self.SIndex)
+		TranslateToSymbol = ['i', 'id', 'j', 'jd', 'k', 'kd', 'l', 'ld'] # Takes index to 2i and 2i+1 as symbols to remove
+		ExtraOrbitalLists1 = []
+		ExtraNormalOrders1 = []
+		ExtraOrbitalLists2 = []
+		ExtraNormalOrders2 = []
+		ExtraOrbitalLists3 = []
+		ExtraNormalOrders3 = []
+		for n in range(len(ijklBath)):
+			if ijklBath[n] == 1:
+				ExtraOrbList1 = OrbitalListNoT.copy()
+				del ExtraOrbList1[2*n:(2*n+2)]
+				ExtraNormalOrder1 = NormalOrder.copy()
+				ExtraNormalOrder1.remove(TranslateToSymbols[2 * n])
+				ExtraNormalOrder1.remove(TranslateToSymbols[2 * n + 1])
+				ExtraOrbitalLists1.append(ExtraOrbList1)
+				ExtraNormalOrders1.append(ExtraNormalOrder1)
+				for m in range(len(ijklBath) - n - 1):
+					if ijklBath[n + m + 1] == 1:
+						ExtraOrbList2 = ExtraOrbList1.copy()
+						del ExtraOrbList2[(2*m):(2*m+2)]
+						ExtraNormalOrder2 = ExtraNormalOrder1.copy()
+						ExtraNormalOrder2.remove(TranslateToSymbols[2 * (n + m + 1)])
+						ExtraNormalOrder2.remove(TranslateToSymbols[2 * (n + m + 1) + 1])
+						ExtraOrbitalLists2.append(ExtraOrbList2)
+						ExtraNormalOrders2.append(ExtraNormalOrder2)
+						if Containskl:
+							for o in range(len(ijklBath) - n - m - 1):
+								if ijklBath[n + m + o + 1] == 1:
+									ExtraOrbList3 = ExtraOrbList2.copy()
+									del ExtraOrbList3[(2*o):(2*o+2)]
+									ExtraNormalOrder3 = ExtraNormalOrder2.copy()
+									ExtraNormalOrder3.remove(TranslateToSymbols[2 * (n + m + o + 1)])
+									ExtraNormalOrder3.remove(TranslateToSymbols[2 * (n + m + o + 1) + 1])
+									ExtraOrbitalLists3.append(ExtraOrbList3)
+									ExtraNormalOrders3.append(ExtraNormalOrder3)
+		ijklBathNum = 0
+		for x in ijklBath:
+			ijklBathNum = ijklBathNum + x
+
 		if len(OrbitalListNoT) == 0 and Case == 'MF':
 			return 1.0
 		for n in range(len(SymbolsS)):
@@ -585,7 +644,7 @@ if __name__ == '__main__':
 	from functools import reduce
 	from pyscf import gto, scf, mp, lo, ao2mo
 	from frankenstein.tools.tensor_utils import get_symm_mat_pow
-	N = 4
+	N = 6
 	nocc = int(N / 2)
 	r = 1.0
 	mol = gto.Mole()
@@ -604,7 +663,7 @@ if __name__ == '__main__':
 	mo_occ = mo_coeff[:, :nocc]
 	mo_occ = np.dot(StoOrth.T, mo_occ)
 	P = np.dot(mo_occ, mo_occ.T)
-	Nf = 1
+	Nf = 2
 	PFrag = P[:Nf, :Nf]
 	PEnvBath = P[Nf:, Nf:]
 	eEnv, vEnv = np.linalg.eigh(PEnvBath)
