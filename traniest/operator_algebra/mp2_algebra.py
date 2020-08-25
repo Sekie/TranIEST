@@ -321,10 +321,7 @@ class MP2Bath:
 		ExtraNormalOrders3 = []
 		ExtraOrbitalLists4 = []
 		ExtraNormalOrders4 = []
-		SymbolsS1 = SymbolsS.copy()
-		SymbolsS2 = SymbolsS.copy()
-		SymbolsS3 = SymbolsS.copy()
-		SymbolsS4 = SymbolsS.copy()
+		RemovedSymbols1 = []; RemovedSymbols2 = []; RemovedSymbols3 = []; RemovedSymbols4 = []
 		for n in range(len(ijklBath)):
 			if ijklBath[n] == 1:
 				ExtraOrbList1 = OrbitalListNoT.copy()
@@ -334,9 +331,7 @@ class MP2Bath:
 				ExtraNormalOrder1.remove(TranslateToSymbols[2 * n + 1])
 				ExtraOrbitalLists1.append(ExtraOrbList1)
 				ExtraNormalOrders1.append(ExtraNormalOrder1)
-				for nn in range(len(SymbolsS1)):
-					SymbolsS1[nn][0].remove(TranslateToSymbols[2 * n])
-					SymbolsS1[nn][1].remove(TranslateToSymbols[2 * n + 1])		
+				RemovedSymbols1.append([TranslateToSymbols[2 * n], TranslateToSymbols[2 * n + 1]])	
 				for m in range(len(ijklBath) - n - 1):
 					if ijklBath[n + m + 1] == 1:
 						ExtraOrbList2 = ExtraOrbList1.copy()
@@ -346,7 +341,7 @@ class MP2Bath:
 						ExtraNormalOrder2.remove(TranslateToSymbols[2 * (n + m + 1) + 1])
 						ExtraOrbitalLists2.append(ExtraOrbList2)
 						ExtraNormalOrders2.append(ExtraNormalOrder2)
-						for nn in range(len(SymbolsS2)):
+						RemovedSymbols2.append([TranslateToSymbols[2 * n], TranslateToSymbols[2 * n + 1], TranslateToSymbols[2 * (n + m + 1)], TranslateToSymbols[2 * (n + m + 1) + 1]])
 							SymbolsS2[nn][0].remove(TranslateToSymbols[2 * n])
 							SymbolsS2[nn][1].remove(TranslateToSymbols[2 * n + 1])
 							SymbolsS2[nn][0].remove(TranslateToSymbols[2 * (n + m + 1)])
@@ -361,13 +356,7 @@ class MP2Bath:
 									ExtraNormalOrder3.remove(TranslateToSymbols[2 * (n + m + o + 1) + 1])
 									ExtraOrbitalLists3.append(ExtraOrbList3)
 									ExtraNormalOrders3.append(ExtraNormalOrder3)
-									for nn in range(len(SymbolsS3)):
-										SymbolsS3[nn][0].remove(TranslateToSymbols[2 * n])
-										SymbolsS3[nn][1].remove(TranslateToSymbols[2 * n + 1])
-										SymbolsS3[nn][0].remove(TranslateToSymbols[2 * (n + m + 1)])
-										SymbolsS3[nn][1].remove(TranslateToSymbols[2 * (n + m + 1) + 1])
-										SymbolsS3[nn][0].remove(TranslateToSymbols[2 * (n + m + o + 1)])
-										SymbolsS3[nn][1].remove(TranslateToSymbols[2 * (n + m + o + 1) + 1])
+									RemovedSymbols3.append([TranslateToSymbols[2 * n], TranslateToSymbols[2 * n + 1], TranslateToSymbols[2 * (n + m + 1)], TranslateToSymbols[2 * (n + m + 1) + 1], TranslateToSymbols[2 * (n + m + o + 1)], TranslateToSymbols[2 * (n + m + o + 1) + 1]])
 									for p in range(len(ijklBath) - n - m - o - 1):
 										if ijklBath[n + m + o + p + 1] == 1:
 											ExtraOrbList4 = ExtraOrbList3.copy()
@@ -377,19 +366,11 @@ class MP2Bath:
 											ExtraNormalOrder4.remove(TranslateToSymbols[2 * (n + m + o + p + 1) + 1])
 											ExtraOrbitalLists4.append(ExtraOrbList4)
 											ExtraNormalOrders4.append(ExtraNormalOrder4)
-											for nn in range(len(SymbolsS4)):
-												SymbolsS4[nn][0].remove(TranslateToSymbols[2 * n])
-												SymbolsS4[nn][1].remove(TranslateToSymbols[2 * n + 1])
-												SymbolsS4[nn][0].remove(TranslateToSymbols[2 * (n + m + 1)])
-												SymbolsS4[nn][1].remove(TranslateToSymbols[2 * (n + m + 1) + 1])
-												SymbolsS4[nn][0].remove(TranslateToSymbols[2 * (n + m + o + 1)])
-												SymbolsS4[nn][1].remove(TranslateToSymbols[2 * (n + m + o + 1) + 1])
-												SymbolsS4[nn][0].remove(TranslateToSymbols[2 * (n + m + o + p + 1)])
-												SymbolsS4[nn][1].remove(TranslateToSymbols[2 * (n + m + o + p + 1) + 1])
-
+											RemovedSymbols4 = [TranslateToSymbols]
 		ijklBathNum = 0
 		for x in ijklBath:
 			ijklBathNum = ijklBathNum + x
+		ijklBathNum = ijklBathNum % 2
 
 		for n in range(len(SymbolsS)):
 			if Case == 'MF':
@@ -408,7 +389,79 @@ class MP2Bath:
 			SignsS1 = []; SignsS2 = []; SignsS3 = []; SignsS4 = []
 			SignsE1 = []; SignsE2 = []; SignsE3 = []; SignsE4 = []
 			Sign1 = []; Sign2 = []; Sign3 = []; Sign4 = []
-			
+			for a in range(len(ExtraNormalOrders1)):
+				SymS = SymbolsS[n].copy()
+				for x in RemovedSymbols1[a]:
+					if x in SymS[0]:
+						SymS[0].remove(x)
+					if x in SymS[1]:
+						SymS[1].remove(x)
+				aPosS, aPosE = CaseToOperatorPositions(SymS, SymbolsE[n], ExtraNormalOrders1[a])
+				aSign = SignOfSeparation(aPosE[0] + aPosE[1])
+				aConS, aPorQS, aSignsS = WickContraction(aPosS[0], aPosS[1])
+				aConE, aPorQE, aSignsE = WickContraction(aPosE[0], aPosE[1])
+				ConS1.append(aConS)
+				ConE1.append(aConE)
+				PorQS1.append(aPorQS)
+				PorQE1.append(aPorQE)
+				SignsS1.append(aSignsS)
+				SignsE1.append(aSignsE)
+				Sign1.append(aSign)
+			for a in range(len(ExtraNormalOrders2)):
+				SymS = SymbolsS[n].copy()
+				for x in RemovedSymbols2[a]:
+					if x in SymS[0]:
+						SymS[0].remove(x)
+					if x in SymS[1]:
+						SymS[1].remove(x)
+				aPosS, aPosE = CaseToOperatorPositions(SymS, SymbolsE[n], ExtraNormalOrders2[a])
+				aSign = SignOfSeparation(aPosE[0] + aPosE[1])
+				aConS, aPorQS, aSignsS = WickContraction(aPosS[0], aPosS[1])
+				aConE, aPorQE, aSignsE = WickContraction(aPosE[0], aPosE[1])
+				ConS2.append(aConS)
+				ConE2.append(aConE)
+				PorQS2.append(aPorQS)
+				PorQE2.append(aPorQE)
+				SignsS2.append(aSignsS)
+				SignsE2.append(aSignsE)
+				Sign2.append(aSign)
+			for a in range(len(ExtraNormalOrders3)):
+				SymS = SymbolsS[n].copy()
+				for x in RemovedSymbols3[a]:
+					if x in SymS[0]:
+						SymS[0].remove(x)
+					if x in SymS[1]:
+						SymS[1].remove(x)
+				aPosS, aPosE = CaseToOperatorPositions(SymS, SymbolsE[n], ExtraNormalOrders3[a])
+				aSign = SignOfSeparation(aPosE[0] + aPosE[1])
+				aConS, aPorQS, aSignsS = WickContraction(aPosS[0], aPosS[1])
+				aConE, aPorQE, aSignsE = WickContraction(aPosE[0], aPosE[1])
+				ConS3.append(aConS)
+				ConE3.append(aConE)
+				PorQS3.append(aPorQS)
+				PorQE3.append(aPorQE)
+				SignsS3.append(aSignsS)
+				SignsE3.append(aSignsE)
+				Sign3.append(aSign)
+			for a in range(len(ExtraNormalOrders4)):
+				SymS = SymbolsS[n].copy()
+				for x in RemovedSymbols4[a]:
+					if x in SymS[0]:
+						SymS[0].remove(x)
+					if x in SymS[1]:
+						SymS[1].remove(x)
+				aPosS, aPosE = CaseToOperatorPositions(SymS, SymbolsE[n], ExtraNormalOrders4[a])
+				aSign = SignOfSeparation(aPosE[0] + aPosE[1])
+				aConS, aPorQS, aSignsS = WickContraction(aPosS[0], aPosS[1])
+				aConE, aPorQE, aSignsE = WickContraction(aPosE[0], aPosE[1])
+				ConS4.append(aConS)
+				ConE4.append(aConE)
+				PorQS4.append(aPorQS)
+				PorQE4.append(aPorQE)
+				SignsS4.append(aSignsS)
+				SignsE4.append(aSignsE)
+				Sign4.append(aSign)
+
 			tIndices, uIndices, vIndices, wIndices = self.GetAmplitudeIndices(SymbolsS[n])
 			for t in tIndices:
 				for u in uIndices:
@@ -425,6 +478,73 @@ class MP2Bath:
 							ExpS = CalcWickTerms(ConOrbsS, PorQS, SignsS, self.PS, self.QS)
 							ExpE = CalcWickTerms(ConOrbsE, PorQE, SignsE, self.PE, self.QE)
 							ExpSE = float(Sign) * ExpS * ExpE
+
+							ConOrbsS1 = []; ConOrbsS2 = []; ConOrbsS3 = []; ConOrbsS4 = []
+							ExpSE1 = []; ExpSE2 = []; ExpSE3 = []; ExpSE4 = []
+							for a in range(len(ExtraOrbitalLists1)):
+								if Case == 'Right':
+									ExtraOrbitalLists1[a] = ExtraOrbitalLists1[a] + [v, w, u, t]
+								if Case == 'Left':
+									ExtraOrbitalLists1[a] = [t, u, w, v] + ExtraOrbitalLists1[a]
+								aConOrbsS = ContractionIndexToOrbitals(ConS1[a], ExtraOrbitalList1[a])
+								aConOrbsE = ContractionIndexToOrbitals(ConE1[a], ExtraOrbitalList1[a])
+								aExpS = CalcWickTerms(aConOrbsS, PorQS1[a], SignsS1[a], self.PS, self.QS)
+								aExpE = CalcWickTerms(aconOrbsE, PorQE1[a], SIgnsE1[a], self.PE, self.QE)
+								aExpSE = float(Sign1[a]) * aExpS * aExpE
+								ExpSE1.append(aExpSE)
+							for a in range(len(ExtraOrbitalLists2)):
+								if Case == 'Right':
+									ExtraOrbitalLists2[a] = ExtraOrbitalLists2[a] + [v, w, u, t]
+								if Case == 'Left':
+									ExtraOrbitalLists2[a] = [t, u, w, v] + ExtraOrbitalLists2[a]
+								aConOrbsS = ContractionIndexToOrbitals(ConS2[a], ExtraOrbitalList2[a])
+								aConOrbsE = ContractionIndexToOrbitals(ConE2[a], ExtraOrbitalList2[a])
+								aExpS = CalcWickTerms(aConOrbsS, PorQS2[a], SignsS2[a], self.PS, self.QS)
+								aExpE = CalcWickTerms(aconOrbsE, PorQE2[a], SIgnsE2[a], self.PE, self.QE)
+								aExpSE = float(Sign2[a]) * aExpS * aExpE
+								ExpSE2.append(aExpSE)
+
+							for a in range(len(ExtraOrbitalLists3)):
+								if Case == 'Right':
+									ExtraOrbitalLists3[a] = ExtraOrbitalLists3[a] + [v, w, u, t]
+								if Case == 'Left':
+									ExtraOrbitalLists3[a] = [t, u, w, v] + ExtraOrbitalLists3[a]
+								aConOrbsS = ContractionIndexToOrbitals(ConS3[a], ExtraOrbitalList3[a])
+								aConOrbsE = ContractionIndexToOrbitals(ConE3[a], ExtraOrbitalList3[a])
+								aExpS = CalcWickTerms(aConOrbsS, PorQS3[a], SignsS3[a], self.PS, self.QS)
+								aExpE = CalcWickTerms(aconOrbsE, PorQE3[a], SIgnsE3[a], self.PE, self.QE)
+								aExpSE = float(Sign3[a]) * aExpS * aExpE
+								ExpSE3.append(aExpSE)
+
+							for a in range(len(ExtraOrbitalLists1)):
+								if Case == 'Right':
+									ExtraOrbitalLists4[a] = ExtraOrbitalLists4[a] + [v, w, u, t]
+								if Case == 'Left':
+									ExtraOrbitalLists4[a] = [t, u, w, v] + ExtraOrbitalLists4[a]
+								aConOrbsS = ContractionIndexToOrbitals(ConS4[a], ExtraOrbitalList4[a])
+								aConOrbsE = ContractionIndexToOrbitals(ConE4[a], ExtraOrbitalList4[a])
+								aExpS = CalcWickTerms(aConOrbsS, PorQS4[a], SignsS4[a], self.PS, self.QS)
+								aExpE = CalcWickTerms(aconOrbsE, PorQE4[a], SIgnsE4[a], self.PE, self.QE)
+								aExpSE = float(Sign4[a]) * aExpS * aExpE
+								ExpSE4.append(aExpSE)
+							
+							# Add all projection cases
+							if ijklBathNum == 1:
+								ExpSE = -1.0 * ExpSE
+							Parity1 = 1.0; Parity2 = 1.0; Parity3 = 1.0; Parity4 = 1.0
+							if ijklBathNum == 1:
+								Parity2 = -1.0; Parity4 = -1.0
+							else:
+								Parity1 = -1.0; Parity3 = -1.0
+							for a in ExpSE1:
+								ExpSE = ExpSE + Parity1 * a
+							for a in ExpSE2:
+								ExpSE = ExpSE + Parity2 * a
+							for a in ExpSE3:
+								ExpSE = ExpSE + Parity3 * a
+							for a in ExpSE4:
+								ExpSE = ExpSE + Parity4 * a	
+
 							AElement += self.t[t, u, v, w] * ExpSE
 		return AElement
 
