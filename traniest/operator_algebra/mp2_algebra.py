@@ -1,4 +1,5 @@
 from itertools import combinations
+from copy import deepcopy
 import numpy as np
 from wick import WickContraction, ContractionIndexToOrbitals
 
@@ -426,12 +427,11 @@ class MP2Bath:
 
 		SymbolsS, SymbolsE = GenerateSubspaceCases(CrSymbols, AnSymbols, FixedCrA = FixedCrS, FixedAnA = FixedAnS)
 		for n in range(len(SymbolsS)):
-			SymbolsS, SymbolsE = GenerateSubspaceCases(CrSymbols, AnSymbols, FixedCrA = FixedCrS, FixedAnA = FixedAnS) # Some hack to get around this weird changing list issue..
 			if Case == 'MF':
 				ExpSE = self.CalcExpValue(SymbolsS[n], SymbolsE[n], NormalOrder, OrbitalListNoT)
 				ExpSE1 = []; ExpSE2 = []; ExpSE3 = []; ExpSE4 = [];
 				for a in range(len(ExtraNormalOrders1)):
-					SymS = SymbolsS[n].copy()
+					SymS = deepcopy(SymbolsS[n])
 					for x in RemovedSymbols1[a]:
 						if x in SymS[0]:
 							SymS[0].remove(x)
@@ -440,7 +440,7 @@ class MP2Bath:
 					aExpSE = self.CalcExpValue(SymS, SymbolsE[n], ExtraNormalOrders1[a], OrbitalListNoT)
 					ExpSE1.append(aExpSE)
 				for a in range(len(ExtraNormalOrders2)):
-					SymS = SymbolsS[n].copy()
+					SymS = deepcopy(SymbolsS[n])
 					for x in RemovedSymbols2[a]:
 						if x in SymS[0]:
 							SymS[0].remove(x)
@@ -449,7 +449,7 @@ class MP2Bath:
 					aExpSE = self.CalcExpValue(SymS, SymbolsE[n], ExtraNormalOrders2[a], OrbitalListNoT)
 					ExpSE2.append(aExpSE)
 				for a in range(len(ExtraNormalOrders3)):
-					SymS = SymbolsS[n].copy()
+					SymS = deepcopy(SymbolsS[n])
 					for x in RemovedSymbols3[a]:
 						if x in SymS[0]:
 							SymS[0].remove(x)
@@ -459,7 +459,7 @@ class MP2Bath:
 					ExpSE3.append(aExpSE)
 	
 				for a in range(len(ExtraNormalOrders4)):
-					SymS = SymbolsS[n].copy()
+					SymS = deepcopy(SymbolsS[n])
 					for x in RemovedSymbols4[a]:
 						if x in SymS[0]:
 							SymS[0].remove(x)
@@ -498,7 +498,7 @@ class MP2Bath:
 			SignsE1 = []; SignsE2 = []; SignsE3 = []; SignsE4 = []
 			Sign1 = []; Sign2 = []; Sign3 = []; Sign4 = []
 			for a in range(len(ExtraNormalOrders1)):
-				SymS = SymbolsS[n].copy()
+				SymS = deepcopy(SymbolsS[n])
 				for x in RemovedSymbols1[a]:
 					if x in SymS[0]:
 						SymS[0].remove(x)
@@ -516,7 +516,7 @@ class MP2Bath:
 				SignsE1.append(aSignsE)
 				Sign1.append(aSign)
 			for a in range(len(ExtraNormalOrders2)):
-				SymS = SymbolsS[n].copy()
+				SymS = deepcopy(SymbolsS[n])
 				for x in RemovedSymbols2[a]:
 					if x in SymS[0]:
 						SymS[0].remove(x)
@@ -534,7 +534,7 @@ class MP2Bath:
 				SignsE2.append(aSignsE)
 				Sign2.append(aSign)
 			for a in range(len(ExtraNormalOrders3)):
-				SymS = SymbolsS[n].copy()
+				SymS = deepcopy(SymbolsS[n])
 				for x in RemovedSymbols3[a]:
 					if x in SymS[0]:
 						SymS[0].remove(x)
@@ -552,7 +552,7 @@ class MP2Bath:
 				SignsE3.append(aSignsE)
 				Sign3.append(aSign)
 			for a in range(len(ExtraNormalOrders4)):
-				SymS = SymbolsS[n].copy()
+				SymS = deepcopy(SymbolsS[n])
 				for x in RemovedSymbols4[a]:
 					if x in SymS[0]:
 						SymS[0].remove(x)
