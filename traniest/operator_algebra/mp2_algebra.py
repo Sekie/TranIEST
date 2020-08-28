@@ -629,8 +629,8 @@ class MP2Bath:
 									ExtraOrbitalLists4[a] = ExtraOrbitalLists4[a] + [v, w, u, t]
 								if Case == 'Left':
 									ExtraOrbitalLists4[a] = [t, u, w, v] + ExtraOrbitalLists4[a]
-								aConOrbsS = ContractionIndexToOrbitals(ConS4[a], ExtraOrbitalList4[a])
-								aConOrbsE = ContractionIndexToOrbitals(ConE4[a], ExtraOrbitalList4[a])
+								aConOrbsS = ContractionIndexToOrbitals(ConS4[a], ExtraOrbitalLists4[a])
+								aConOrbsE = ContractionIndexToOrbitals(ConE4[a], ExtraOrbitalLists4[a])
 								aExpS = CalcWickTerms(aConOrbsS, PorQS4[a], SignsS4[a], self.PS, self.QS)
 								aExpE = CalcWickTerms(aConOrbsE, PorQE4[a], SignsE4[a], self.PE, self.QE)
 								aExpSE = float(Sign4[a]) * aExpS * aExpE
@@ -996,6 +996,8 @@ if __name__ == '__main__':
 	mol.atom = []
 	for i in range(N):
 		angle = i / N * 2.0 * np.pi
+		if i == 1:
+			angle = angle + 0.8 * angle
 		mol.atom.append(('H', (r * np.sin(angle), r * np.cos(angle), 0)))
 	mol.basis = 'sto-3g'
 	mol.build(verbose = 0)
