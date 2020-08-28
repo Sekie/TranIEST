@@ -419,8 +419,8 @@ class MP2Bath:
 		for n in range(len(ijklBath)):
 			if ijkl[n] in self.BIndex:
 				ijklBath[n] = 1
-				OrbitalListNoT[2 * n] = ijkl[n] - len(self.SIndex)
-				OrbitalListNoT[2 * n + 1] = ijkl[n] - len(self.SIndex)
+				OrbitalListNoT[2 * n] = ijkl[n] - len(self.BIndex)
+				OrbitalListNoT[2 * n + 1] = ijkl[n] - len(self.BIndex)
 
 		ExtraNormalOrders1, ExtraNormalOrders2, ExtraNormalOrders3, ExtraNormalOrders4, ExtraOrbitalLists1, ExtraOrbitalLists2, ExtraOrbitalLists3, ExtraOrbitalLists4, RemovedSymbols1, RemovedSymbols2, RemovedSymbols3, RemovedSymbols4, ijklBathNum = MakeProjectorCases(ijklBath, NormalOrder, OrbitalListNoT, Containskl)
 
@@ -897,10 +897,10 @@ class MP2Bath:
 						ijklBath = ijBath.copy()
 						ijklBath = ijklBath + [0, 0]
 						if k in self.BIndex:
-							kval = kval - len(self.SIndex)
+							kval = kval - len(self.BIndex)
 							ijklBath[2] = 1
 						if l in self.BIndex:
-							lval = lval - len(self.SIndex)
+							lval = lval - len(self.BIndex)
 							ijklBath[3] = 1
 
 						NormalOrders1, NormalOrders2, NormalOrders3, NormalOrders4, OrbitalLists1, OrbitalLists2, OrbitalLists3, OrbitalLists4, RemovedSymbols1, RemovedSymbols2, RemovedSymbols3, RemovedSymbols4, ijklBathNum = MakeProjectorCases(ijklBath, ['id', 'i', 'jd', 'j', 'kd', 'k', 'ld', 'l'], [ival, ival, jval, jval, kval, kval, lval, lval], True)
@@ -1008,7 +1008,7 @@ if __name__ == '__main__':
 	mo_occ = mo_coeff[:, :nocc]
 	mo_occ = np.dot(StoOrth.T, mo_occ)
 	P = np.dot(mo_occ, mo_occ.T)
-	Nf = 2
+	Nf = 1 
 	PFrag = P[:Nf, :Nf]
 	PEnvBath = P[Nf:, Nf:]
 	eEnv, vEnv = np.linalg.eigh(PEnvBath)
