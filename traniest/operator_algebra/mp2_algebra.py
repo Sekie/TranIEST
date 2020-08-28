@@ -93,7 +93,8 @@ def GenerateSubspaceCases(CrIndex, AnIndex, FixedCrA = None, FixedAnA = None, Fi
 				if Skip:
 					Skip = False
 					continue
-
+				assert len(CrA[i]) == len(AnA[j])
+				assert len(CrB[i]) == len(AnB[j])
 				IndicesA.append([CrA[i], AnA[j]])
 				IndicesB.append([CrB[i], AnB[j]])
 	return IndicesA, IndicesB
@@ -217,34 +218,34 @@ def MakeProjectorCases(ijklBath, NormalOrder, OrbitalListNoT, Containskl):
 			ExtraOrbitalLists1.append(ExtraOrbList1)
 			ExtraNormalOrders1.append(ExtraNormalOrder1)
 			RemovedSymbols1.append([TranslateToSymbols[2 * n], TranslateToSymbols[2 * n + 1]])	
-			for m in range(len(ijklBath) - n - 1):
-				if ijklBath[n + m + 1] == 1:
+			for m in range(n + 1, len(ijklBath)):
+				if ijklBath[m] == 1:
 					ExtraOrbList2 = ExtraOrbList1.copy()
-					del ExtraOrbList2[(2*m):(2*m+2)]
+					del ExtraOrbList2[(2*(m-n-1)):(2*(m-n-1)+2)]
 					ExtraNormalOrder2 = ExtraNormalOrder1.copy()
-					ExtraNormalOrder2.remove(TranslateToSymbols[2 * (n + m + 1)])
-					ExtraNormalOrder2.remove(TranslateToSymbols[2 * (n + m + 1) + 1])
+					ExtraNormalOrder2.remove(TranslateToSymbols[2 * m])
+					ExtraNormalOrder2.remove(TranslateToSymbols[2 * m + 1])
 					ExtraOrbitalLists2.append(ExtraOrbList2)
 					ExtraNormalOrders2.append(ExtraNormalOrder2)
-					RemovedSymbols2.append([TranslateToSymbols[2 * n], TranslateToSymbols[2 * n + 1], TranslateToSymbols[2 * (n + m + 1)], TranslateToSymbols[2 * (n + m + 1) + 1]])
+					RemovedSymbols2.append([TranslateToSymbols[2 * n], TranslateToSymbols[2 * n + 1], TranslateToSymbols[2 * m], TranslateToSymbols[2 * m + 1]])
 					if Containskl:
-						for o in range(len(ijklBath) - n - m - 1):
-							if ijklBath[n + m + o + 1] == 1:
+						for o in range(m + 1, len(ijklBath)):
+							if ijklBath[o] == 1:
 								ExtraOrbList3 = ExtraOrbList2.copy()
-								del ExtraOrbList3[(2*o):(2*o+2)]
+								del ExtraOrbList3[(2*(o-m-n-1)):(2*(o-m-n-1)+2)]
 								ExtraNormalOrder3 = ExtraNormalOrder2.copy()
-								ExtraNormalOrder3.remove(TranslateToSymbols[2 * (n + m + o + 1)])
-								ExtraNormalOrder3.remove(TranslateToSymbols[2 * (n + m + o + 1) + 1])
+								ExtraNormalOrder3.remove(TranslateToSymbols[2 * o])
+								ExtraNormalOrder3.remove(TranslateToSymbols[2 * o + 1])
 								ExtraOrbitalLists3.append(ExtraOrbList3)
 								ExtraNormalOrders3.append(ExtraNormalOrder3)
-								RemovedSymbols3.append([TranslateToSymbols[2 * n], TranslateToSymbols[2 * n + 1], TranslateToSymbols[2 * (n + m + 1)], TranslateToSymbols[2 * (n + m + 1) + 1], TranslateToSymbols[2 * (n + m + o + 1)], TranslateToSymbols[2 * (n + m + o + 1) + 1]])
-								for p in range(len(ijklBath) - n - m - o - 1):
-									if ijklBath[n + m + o + p + 1] == 1:
+								RemovedSymbols3.append([TranslateToSymbols[2 * n], TranslateToSymbols[2 * n + 1], TranslateToSymbols[2 * m], TranslateToSymbols[2 * m + 1], TranslateToSymbols[2 * o], TranslateToSymbols[2 * o + 1]])
+								for p in range(o + 1, len(ijklBath)):
+									if ijklBath[p] == 1:
 										ExtraOrbList4 = ExtraOrbList3.copy()
-										del ExtraOrbList4[(2*p):(2*p+2)]
+										del ExtraOrbList4[(2*(p-o-m-n-1)):(2*(p-o-m-n-1)+2)]
 										ExtraNormalOrder4 = ExtraNormalOrder3.copy()
-										ExtraNormalOrder4.remove(TranslateToSymbols[2 * (n + m + o + p + 1)])
-										ExtraNormalOrder4.remove(TranslateToSymbols[2 * (n + m + o + p + 1) + 1])
+										ExtraNormalOrder4.remove(TranslateToSymbols[2 * p])
+										ExtraNormalOrder4.remove(TranslateToSymbols[2 * p + 1])
 										ExtraOrbitalLists4.append(ExtraOrbList4)
 										ExtraNormalOrders4.append(ExtraNormalOrder4)
 										RemovedSymbols4 = [TranslateToSymbols]
@@ -397,7 +398,6 @@ class MP2Bath:
 	For the cases where ijkl are in B, we assume that OrbitalListNoT is in the order [i, i, j, j, k, k, l, l, ...]
 	'''
 	def CalcAElements(self, CrSymbols, AnSymbols, NormalOrder, OrbitalListNoT, FixedCrS = None, FixedAnS = None, Case = 'MF'):
-		SymbolsS, SymbolsE = GenerateSubspaceCases(CrSymbols, AnSymbols, FixedCrA = FixedCrS, FixedAnA = FixedAnS)
 		AElement = 0.0
 
 		if len(OrbitalListNoT) == 0 and Case == 'MF':
@@ -411,8 +411,8 @@ class MP2Bath:
 			ijkl.append(OrbitalListNoT[0])
 			ijkl.append(OrbitalListNoT[2])
 			if Containskl:
-				ijkl.append(OrbitalList[4])
-				ijkl.append(OrbitalList[6])
+				ijkl.append(OrbitalListNoT[4])
+				ijkl.append(OrbitalListNoT[6])
 				ijklBath = [0, 0, 0, 0]
 			else:
 				ijklBath = [0, 0]
@@ -424,7 +424,9 @@ class MP2Bath:
 
 		ExtraNormalOrders1, ExtraNormalOrders2, ExtraNormalOrders3, ExtraNormalOrders4, ExtraOrbitalLists1, ExtraOrbitalLists2, ExtraOrbitalLists3, ExtraOrbitalLists4, RemovedSymbols1, RemovedSymbols2, RemovedSymbols3, RemovedSymbols4, ijklBathNum = MakeProjectorCases(ijklBath, NormalOrder, OrbitalListNoT, Containskl)
 
+		SymbolsS, SymbolsE = GenerateSubspaceCases(CrSymbols, AnSymbols, FixedCrA = FixedCrS, FixedAnA = FixedAnS)
 		for n in range(len(SymbolsS)):
+			SymbolsS, SymbolsE = GenerateSubspaceCases(CrSymbols, AnSymbols, FixedCrA = FixedCrS, FixedAnA = FixedAnS) # Some hack to get around this weird changing list issue..
 			if Case == 'MF':
 				ExpSE = self.CalcExpValue(SymbolsS[n], SymbolsE[n], NormalOrder, OrbitalListNoT)
 				ExpSE1 = []; ExpSE2 = []; ExpSE3 = []; ExpSE4 = [];
@@ -468,7 +470,7 @@ class MP2Bath:
 				if ijklBathNum == 1:
 					ExpSE = -1.0 * ExpSE
 				Parity1 = 1.0; Parity2 = 1.0; Parity3 = 1.0; Parity4 = 1.0
-				if ijkBathNum == 1:
+				if ijklBathNum == 1:
 					Parity2 = -1.0; Parity4 = -1.0
 				else:
 					Parity1 = -1.0; Parity3 = -1.0
@@ -592,10 +594,10 @@ class MP2Bath:
 									ExtraOrbitalLists1[a] = ExtraOrbitalLists1[a] + [v, w, u, t]
 								if Case == 'Left':
 									ExtraOrbitalLists1[a] = [t, u, w, v] + ExtraOrbitalLists1[a]
-								aConOrbsS = ContractionIndexToOrbitals(ConS1[a], ExtraOrbitalList1[a])
-								aConOrbsE = ContractionIndexToOrbitals(ConE1[a], ExtraOrbitalList1[a])
+								aConOrbsS = ContractionIndexToOrbitals(ConS1[a], ExtraOrbitalLists1[a])
+								aConOrbsE = ContractionIndexToOrbitals(ConE1[a], ExtraOrbitalLists1[a])
 								aExpS = CalcWickTerms(aConOrbsS, PorQS1[a], SignsS1[a], self.PS, self.QS)
-								aExpE = CalcWickTerms(aconOrbsE, PorQE1[a], SIgnsE1[a], self.PE, self.QE)
+								aExpE = CalcWickTerms(aConOrbsE, PorQE1[a], SignsE1[a], self.PE, self.QE)
 								aExpSE = float(Sign1[a]) * aExpS * aExpE
 								ExpSE1.append(aExpSE)
 							for a in range(len(ExtraOrbitalLists2)):
@@ -603,10 +605,10 @@ class MP2Bath:
 									ExtraOrbitalLists2[a] = ExtraOrbitalLists2[a] + [v, w, u, t]
 								if Case == 'Left':
 									ExtraOrbitalLists2[a] = [t, u, w, v] + ExtraOrbitalLists2[a]
-								aConOrbsS = ContractionIndexToOrbitals(ConS2[a], ExtraOrbitalList2[a])
-								aConOrbsE = ContractionIndexToOrbitals(ConE2[a], ExtraOrbitalList2[a])
+								aConOrbsS = ContractionIndexToOrbitals(ConS2[a], ExtraOrbitalLists2[a])
+								aConOrbsE = ContractionIndexToOrbitals(ConE2[a], ExtraOrbitalLists2[a])
 								aExpS = CalcWickTerms(aConOrbsS, PorQS2[a], SignsS2[a], self.PS, self.QS)
-								aExpE = CalcWickTerms(aconOrbsE, PorQE2[a], SIgnsE2[a], self.PE, self.QE)
+								aExpE = CalcWickTerms(aConOrbsE, PorQE2[a], SignsE2[a], self.PE, self.QE)
 								aExpSE = float(Sign2[a]) * aExpS * aExpE
 								ExpSE2.append(aExpSE)
 
@@ -615,14 +617,14 @@ class MP2Bath:
 									ExtraOrbitalLists3[a] = ExtraOrbitalLists3[a] + [v, w, u, t]
 								if Case == 'Left':
 									ExtraOrbitalLists3[a] = [t, u, w, v] + ExtraOrbitalLists3[a]
-								aConOrbsS = ContractionIndexToOrbitals(ConS3[a], ExtraOrbitalList3[a])
-								aConOrbsE = ContractionIndexToOrbitals(ConE3[a], ExtraOrbitalList3[a])
+								aConOrbsS = ContractionIndexToOrbitals(ConS3[a], ExtraOrbitalLists3[a])
+								aConOrbsE = ContractionIndexToOrbitals(ConE3[a], ExtraOrbitalLists3[a])
 								aExpS = CalcWickTerms(aConOrbsS, PorQS3[a], SignsS3[a], self.PS, self.QS)
-								aExpE = CalcWickTerms(aconOrbsE, PorQE3[a], SIgnsE3[a], self.PE, self.QE)
+								aExpE = CalcWickTerms(aConOrbsE, PorQE3[a], SignsE3[a], self.PE, self.QE)
 								aExpSE = float(Sign3[a]) * aExpS * aExpE
 								ExpSE3.append(aExpSE)
 
-							for a in range(len(ExtraOrbitalLists1)):
+							for a in range(len(ExtraOrbitalLists4)):
 								if Case == 'Right':
 									ExtraOrbitalLists4[a] = ExtraOrbitalLists4[a] + [v, w, u, t]
 								if Case == 'Left':
@@ -630,7 +632,7 @@ class MP2Bath:
 								aConOrbsS = ContractionIndexToOrbitals(ConS4[a], ExtraOrbitalList4[a])
 								aConOrbsE = ContractionIndexToOrbitals(ConE4[a], ExtraOrbitalList4[a])
 								aExpS = CalcWickTerms(aConOrbsS, PorQS4[a], SignsS4[a], self.PS, self.QS)
-								aExpE = CalcWickTerms(aconOrbsE, PorQE4[a], SIgnsE4[a], self.PE, self.QE)
+								aExpE = CalcWickTerms(aConOrbsE, PorQE4[a], SignsE4[a], self.PE, self.QE)
 								aExpSE = float(Sign4[a]) * aExpS * aExpE
 								ExpSE4.append(aExpSE)
 							
@@ -987,7 +989,7 @@ if __name__ == '__main__':
 	from functools import reduce
 	from pyscf import gto, scf, mp, lo, ao2mo
 	from frankenstein.tools.tensor_utils import get_symm_mat_pow
-	N = 6
+	N = 4
 	nocc = int(N / 2)
 	r = 1.0
 	mol = gto.Mole()
