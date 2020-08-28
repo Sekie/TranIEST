@@ -197,7 +197,7 @@ def CalcWickTerms(Contractions, PorQ, Signs, P, Q):
 		return Value
 
 def MakeProjectorCases(ijklBath, NormalOrder, OrbitalListNoT, Containskl):
-	TranslateToSymbol = ['id', 'i', 'jd', 'j', 'kd', 'k', 'ld', 'l'] # Takes index to 2i and 2i+1 as symbols to remove
+	TranslateToSymbols = ['id', 'i', 'jd', 'j', 'kd', 'k', 'ld', 'l'] # Takes index to 2i and 2i+1 as symbols to remove
 	ExtraOrbitalLists1 = []
 	ExtraNormalOrders1 = []
 	ExtraOrbitalLists2 = []
@@ -217,7 +217,7 @@ def MakeProjectorCases(ijklBath, NormalOrder, OrbitalListNoT, Containskl):
 			ExtraOrbitalLists1.append(ExtraOrbList1)
 			ExtraNormalOrders1.append(ExtraNormalOrder1)
 			RemovedSymbols1.append([TranslateToSymbols[2 * n], TranslateToSymbols[2 * n + 1]])	
-		for m in range(len(ijklBath) - n - 1):
+			for m in range(len(ijklBath) - n - 1):
 				if ijklBath[n + m + 1] == 1:
 					ExtraOrbList2 = ExtraOrbList1.copy()
 					del ExtraOrbList2[(2*m):(2*m+2)]
@@ -253,7 +253,7 @@ def MakeProjectorCases(ijklBath, NormalOrder, OrbitalListNoT, Containskl):
 		ijklBathNum = ijklBathNum + x
 	ijklBathNum = ijklBathNum % 2
 
-	return ExtraNormalOrders1, ExtraNormalOrders2, ExtraNormalOrders2, ExtraNormalOrders3, ExtraNormalOrders4, ExtraOrbitalLists1, ExtraOrbitalLists2, ExtraOrbitalLists3, ExtraOrbitalLists4, RemovedSymbols1, RemovedSymbols2, RemovedSymbols3, RemovedSymbols4, ijklBathNum
+	return ExtraNormalOrders1, ExtraNormalOrders2, ExtraNormalOrders3, ExtraNormalOrders4, ExtraOrbitalLists1, ExtraOrbitalLists2, ExtraOrbitalLists3, ExtraOrbitalLists4, RemovedSymbols1, RemovedSymbols2, RemovedSymbols3, RemovedSymbols4, ijklBathNum
 
 def RemoveFromLists(Lists, Remove):
 	for List in Lists:
@@ -261,12 +261,57 @@ def RemoveFromLists(Lists, Remove):
 			if x in List:
 				List.remove(x)
 
+def MakeRemovedCrAnLists(CrSym, AnSym, Remove1, Remove2, Remove3, Remove4):
+	Cr1 = []; Cr2 = []; Cr3 = []; Cr4 = []
+	An1 = []; An2 = []; An3 = []; An4 = []
+	for Rem in Remove1:
+		C = CrSym.copy()
+		A = AnSym.copy()
+		for x in Rem:
+			if x in C:
+				C.remove(x)
+			if x in A:
+				A.remove(x)
+		Cr1.append(C)
+		An1.append(A)
+	for Rem in Remove2:
+		C = CrSym.copy()
+		A = AnSym.copy()
+		for x in Rem:
+			if x in C:
+				C.remove(x)
+			if x in A:
+				A.remove(x)
+		Cr2.append(C)
+		An2.append(A)
+	for Rem in Remove3:
+		C = CrSym.copy()
+		A = AnSym.copy()
+		for x in Rem:
+			if x in C:
+				C.remove(x)
+			if x in A:
+				A.remove(x)
+		Cr3.append(C)
+		An3.append(A)
+	for Rem in Remove4:
+		C = CrSym.copy()
+		A = AnSym.copy()
+		for x in Rem:
+			if x in C:
+				C.remove(x)
+			if x in A:
+				A.remove(x)
+		Cr4.append(C)
+		An4.append(A)
+	return Cr1, Cr2, Cr3, Cr4, An1, An2, An3, An4
+
 class MP2Bath:
-	def __init__(self, t, SIndex, EIndex, PS, PE, h, V):
+	def __init__(self, t, FIndex, BIndex, EIndex, PS, PE, h, V):
 		self.t = t
-		#self.FIndex = FIndex
-		#self.BIndex = BIndex
-		self.SIndex = SIndex #FIndex + BIndex
+		self.FIndex = FIndex
+		self.BIndex = BIndex
+		self.SIndex = FIndex + BIndex
 		self.EIndex = EIndex
 		self.PS = PS
 		self.PE = PE
@@ -376,61 +421,8 @@ class MP2Bath:
 				ijklBath[n] = 1
 				OrbitalListNoT[2 * n] = ijkl[n] - len(self.SIndex)
 				OrbitalListNoT[2 * n + 1] = ijkl[n] - len(self.SIndex)
-		TranslateToSymbol = ['id', 'i', 'jd', 'j', 'kd', 'k', 'ld', 'l'] # Takes index to 2i and 2i+1 as symbols to remove
-		ExtraOrbitalLists1 = []
-		ExtraNormalOrders1 = []
-		ExtraOrbitalLists2 = []
-		ExtraNormalOrders2 = []
-		ExtraOrbitalLists3 = []
-		ExtraNormalOrders3 = []
-		ExtraOrbitalLists4 = []
-		ExtraNormalOrders4 = []
-		RemovedSymbols1 = []; RemovedSymbols2 = []; RemovedSymbols3 = []; RemovedSymbols4 = []
-		for n in range(len(ijklBath)):
-			if ijklBath[n] == 1:
-				ExtraOrbList1 = OrbitalListNoT.copy()
-				del ExtraOrbList1[2*n:(2*n+2)]
-				ExtraNormalOrder1 = NormalOrder.copy()
-				ExtraNormalOrder1.remove(TranslateToSymbols[2 * n])
-				ExtraNormalOrder1.remove(TranslateToSymbols[2 * n + 1])
-				ExtraOrbitalLists1.append(ExtraOrbList1)
-				ExtraNormalOrders1.append(ExtraNormalOrder1)
-				RemovedSymbols1.append([TranslateToSymbols[2 * n], TranslateToSymbols[2 * n + 1]])	
-				for m in range(len(ijklBath) - n - 1):
-					if ijklBath[n + m + 1] == 1:
-						ExtraOrbList2 = ExtraOrbList1.copy()
-						del ExtraOrbList2[(2*m):(2*m+2)]
-						ExtraNormalOrder2 = ExtraNormalOrder1.copy()
-						ExtraNormalOrder2.remove(TranslateToSymbols[2 * (n + m + 1)])
-						ExtraNormalOrder2.remove(TranslateToSymbols[2 * (n + m + 1) + 1])
-						ExtraOrbitalLists2.append(ExtraOrbList2)
-						ExtraNormalOrders2.append(ExtraNormalOrder2)
-						RemovedSymbols2.append([TranslateToSymbols[2 * n], TranslateToSymbols[2 * n + 1], TranslateToSymbols[2 * (n + m + 1)], TranslateToSymbols[2 * (n + m + 1) + 1]])
-						if Containskl:
-							for o in range(len(ijklBath) - n - m - 1):
-								if ijklBath[n + m + o + 1] == 1:
-									ExtraOrbList3 = ExtraOrbList2.copy()
-									del ExtraOrbList3[(2*o):(2*o+2)]
-									ExtraNormalOrder3 = ExtraNormalOrder2.copy()
-									ExtraNormalOrder3.remove(TranslateToSymbols[2 * (n + m + o + 1)])
-									ExtraNormalOrder3.remove(TranslateToSymbols[2 * (n + m + o + 1) + 1])
-									ExtraOrbitalLists3.append(ExtraOrbList3)
-									ExtraNormalOrders3.append(ExtraNormalOrder3)
-									RemovedSymbols3.append([TranslateToSymbols[2 * n], TranslateToSymbols[2 * n + 1], TranslateToSymbols[2 * (n + m + 1)], TranslateToSymbols[2 * (n + m + 1) + 1], TranslateToSymbols[2 * (n + m + o + 1)], TranslateToSymbols[2 * (n + m + o + 1) + 1]])
-									for p in range(len(ijklBath) - n - m - o - 1):
-										if ijklBath[n + m + o + p + 1] == 1:
-											ExtraOrbList4 = ExtraOrbList3.copy()
-											del ExtraOrbList4[(2*p):(2*p+2)]
-											ExtraNormalOrder4 = ExtraNormalOrder3.copy()
-											ExtraNormalOrder4.remove(TranslateToSymbols[2 * (n + m + o + p + 1)])
-											ExtraNormalOrder4.remove(TranslateToSymbols[2 * (n + m + o + p + 1) + 1])
-											ExtraOrbitalLists4.append(ExtraOrbList4)
-											ExtraNormalOrders4.append(ExtraNormalOrder4)
-											RemovedSymbols4 = [TranslateToSymbols]
-		ijklBathNum = 0
-		for x in ijklBath:
-			ijklBathNum = ijklBathNum + x
-		ijklBathNum = ijklBathNum % 2
+
+		ExtraNormalOrders1, ExtraNormalOrders2, ExtraNormalOrders3, ExtraNormalOrders4, ExtraOrbitalLists1, ExtraOrbitalLists2, ExtraOrbitalLists3, ExtraOrbitalLists4, RemovedSymbols1, RemovedSymbols2, RemovedSymbols3, RemovedSymbols4, ijklBathNum = MakeProjectorCases(ijklBath, NormalOrder, OrbitalListNoT, Containskl)
 
 		for n in range(len(SymbolsS)):
 			if Case == 'MF':
@@ -855,7 +847,7 @@ class MP2Bath:
 		NS = len(self.SIndex)
 		DimY = 1 + NS * NS + NS * NS * NS * NS
 		Y = np.zeros((DimY))
-		Y[0] = self.CalcYElements([])
+		Y[0] = self.CalcYElements([], [], [], [])
 		for i in self.SIndex:
 			for j in self.SIndex:
 				ij = self.CombinedIndex([i, j])
@@ -869,59 +861,32 @@ class MP2Bath:
 				if j in self.BIndex:
 					ijBath[1] = 1
 					jval = jval - len(self.BIndex)
-				ijOrbitalList = [ival, ival, jval, jval]
-				ijNormalOrder = ['id', 'i', 'jd', 'j']
-				ijCrList = ['id', 'jd']
-				ijAnList = ['i', 'j']
 
-				ijTranslateToOrb = ['id', 'i', 'jd', 'j']
-				ijExtraOrbitalLists1 = []; ijExtraOrbitalLists2 = []
-				ijExtraNormalOrders1 = []; ijExtraNormalOrders2 = []
-				ijExtraAnLists1 = []; ijExtraAnLists2 = []
-				ijExtraCrLists1 = []; ijExtraCrLists2 = []
-				for n in range(len(ijBath)):
-					if ijBath[n] == 1:
-						ijExtraOrbList = ijOrbitalList.copy()
-						del ijExtraOrbList[(2*n):(2*n + 2)]
-						ijExtraOrbitalLists.append(ijExtraOrbList)
-						ijExtraNormOrder = ijNormalOrder.copy()
-						ijExtraNormOrder.remove(ijTranslateToOrb[2 * n])
-						ijExtraNormOrder.remove(ijTranslateToOrb[2 * n + 1])
-						ijRemoveOrb = []
-						ijRemoveOrb.append([ijTranslateToOrb[2 * n], ijTranslateToOrb[2 * n + 1]])
-						ijExtraNormalOrder1.append(ijExtraNormOrder)
-						ijExtraCrList = ijCrList.copy()
-						ijExtraAnList = ijAnList.copy()
-						for x in ijRemoveOrb:
-							if x in ijExtraCrList:
-								ijExtraCrList.remove(x)
-							if x in ijExtraAnList:
-								ijExtraAnList.remove(x)
-						ijExtraCrLists1.append(ijExtraCrList)
-						ijExtraAnLists1.append(ijExtraAnList)
-						for m in range(len(ijBath - n - 1)):
-							if ijBath[m + n + 1] == 1:	
-								ijExtraOrbList2 = ijExtraOrbList.copy()
-								del ijExtraOrbList2[(2*m):(2*m+2)]
-								ijExtraNormalOrder2 = ijExtraNormOrder.copy()
-								ijExtraNormalOrder2.remove(ijTranslateToOrb[2 * (n + m + 1)])
-								ijExtraNormalOrder2.remove(ijTranslateToOrb[2 * (n + m + 1) + 1])
-								ijExtraOrbitalLists2.append(ijExtraOrbList2)
-								ijExtraNormalOrders2.append(ijExtraNormOrder2)
-								ijRemoveOrb2 = ijRemoveOrb.copy()
-								ijRemoveOrb2.append(ijTranslateToOrb[2 * (n + m + 1)])
-								ijRemoveOrb2.append(ijTranslateToOrb[2 * (n + m + 1)])
-								ijExtraCrList2 = ijExtraCrList.copy()
-								ijExtraAnList2 = ijExtraAnList.copy()
-								for x in ijRemoveOrb2:
-									if x in ijExtraCrList2:
-										ijExtraCrList2.remove(x)
-									if x in ijExtraAnList2:
-										ijExtraAnList2.remove(x)
-								ijExtraCrLists2.append(ijExtraCrList2)
-								ijExtraAnLists2.append(ijExtraAnList2)
+				ijNormalOrders1, ijNormalOrders2, ijNormalOrders3, ijNormalOrders4, ijOrbitalLists1, ijOrbitalLists2, ijOrbitalLists3, ijOrbitalLists4, ijRemovedSymbols1, ijRemovedSymbols2, ijRemovedSymbols3, ijRemovedSymbols4, ijBathNum = MakeProjectorCases(ijBath, ['id', 'i', 'jd', 'j'], [ival, ival, jval, jval], False)
+				ijCrLists1, ijCrLists2, ijCrLists3, ijCrLists4, ijAnLists1, ijAnLists2, ijAnLists3, ijAnLists4 = MakeRemovedCrAnLists(['id', 'jd'], ['i', 'j'], ijRemovedSymbols1, ijRemovedSymbols2, ijRemovedSymbols3, ijRemovedSymbols4)
 
-				Y[ij] = self.CalcYElements([ival, ival, jval, jval])
+				Yij = self.CalcYElements(['id', 'i', 'jd', 'j'], ['id', 'jd'], ['i', 'j'], [ival, ival, jval, jval])
+				Yij1 = []; Yij2 = []
+				for a in range(len(ijNormalOrders1)):
+					aYij = self.CalcYElements(ijNormalOrders1[a], ijCrLists1[a], ijAnLists1[a], ijOrbitalLists1[a])
+					Yij1.append(aYij)
+				for a in range(len(ijNormalOrders2)):
+					aYij = self.CalcYElements(ijNormalOrders2[a], ijCrLists2[a], ijAnLists2[a], ijOrbitalLists2[a])
+					Yij2.append(aYij)
+
+				if ijBathNum == 1:
+					Yij = -1.0 * Yij
+				Parity1 = 1.0; Parity2 = 1.0; Parity3 = 1.0; Parity4 = 1.0
+				if ijBathNum == 1:
+					Parity2 = -1.0; Parity4 = -1.0
+				else:
+					Parity1 = -1.0; Parity3 = -1.0
+				for a in Yij1:
+					Yij = Yij + Parity1 * a
+				for a in Yij2:
+					Yij = Yij + Parity2 * a
+				Y[ij] = Yij
+			
 				for k in self.SIndex:
 					for l in self.SIndex:
 						ijkl = self.CombinedIndex([i, j, k, l])
@@ -937,8 +902,39 @@ class MP2Bath:
 							ijklBath[3] = 1
 
 						NormalOrders1, NormalOrders2, NormalOrders3, NormalOrders4, OrbitalLists1, OrbitalLists2, OrbitalLists3, OrbitalLists4, RemovedSymbols1, RemovedSymbols2, RemovedSymbols3, RemovedSymbols4, ijklBathNum = MakeProjectorCases(ijklBath, ['id', 'i', 'jd', 'j', 'kd', 'k', 'ld', 'l'], [ival, ival, jval, jval, kval, kval, lval, lval], True)
+						CrLists1, CrLists2, CrLists3, CrLists4, AnLists1, AnLists2, AnLists3, AnLists4 = MakeRemovedCrAnLists(['id', 'jd', 'kd', 'ld'], ['i', 'j', 'k', 'l'], RemovedSymbols1, RemovedSymbols2, RemovedSymbols3, RemovedSymbols4)
 
-						Y[ijkl] = self.CalcYElements([i, i, j, j, k, k, l, l])
+						Yijkl = self.CalcYElements(['id', 'i', 'jd', 'j'], ['id', 'jd'], ['i', 'j'], [ival, ival, jval, jval])
+						Yijkl1 = []; Yijkl2 = []; Yijkl3 = []; Yijkl4 = []
+						for a in range(len(NormalOrders1)):
+							aYijkl = self.CalcYElements(NormalOrders1[a], CrLists1[a], AnLists1[a], OrbitalLists1[a])
+							Yijkl1.append(aYijkl)
+						for a in range(len(NormalOrders2)):
+							aYijkl = self.CalcYElements(NormalOrders2[a], CrLists2[a], AnLists2[a], OrbitalLists2[a])
+							Yijkl2.append(aYijkl)
+						for a in range(len(NormalOrders3)):
+							aYijkl = self.CalcYElements(NormalOrders3[a], CrLists3[a], AnLists3[a], OrbitalLists3[a])
+							Yijkl3.append(aYijkl)
+						for a in range(len(NormalOrders4)):
+							aYijkl = self.CalcYElements(NormalOrders4[a], CrLists4[a], AnLists4[a], OrbitalLists4[a])
+							Yijkl4.append(aYijkl)
+
+						if ijklBathNum == 1:
+							Yijkl = -1.0 * Yijkl
+						Parity1 = 1.0; Parity2 = 1.0; Parity3 = 1.0; Parity4 = 1.0
+						if ijBathNum == 1:
+							Parity2 = -1.0; Parity4 = -1.0
+						else:
+							Parity1 = -1.0; Parity3 = -1.0
+						for a in Yijkl1:
+							Yijkl = Yijkl + Parity1 * a
+						for a in Yijkl2:
+							Yijkl = Yijkl + Parity2 * a
+						for a in Yijkl3:
+							Yijkl = Yijkl + Parity3 * a
+						for a in Yijkl4:
+							Yijkl = Yijkl + Parity4 * a
+						Y[ijkl] = Yijkl
 		return Y
 
 	def CalcH(self):
@@ -1053,6 +1049,8 @@ if __name__ == '__main__':
 	tSO = np.einsum('ap,bq,cr,ds,abcd->pqrs', TTotal, TTotal, TTotal, TTotal, tMO)
 
 	SIndex = list(range(PSch.shape[0]))
+	FIndex = SIndex[:int(len(SIndex)/2)]
+	BIndex = SIndex[int(len(SIndex)/2):]
 	EIndex = list(range(PEnv.shape[0]))
 	
 	#tZero = np.zeros((Norb, Norb, Norb, Norb))
@@ -1062,7 +1060,7 @@ if __name__ == '__main__':
 	#mf1.tofile("mf1")
 	#mf2.tofile("mf2")
 
-	myMP2Bath = MP2Bath(tSO, SIndex, EIndex, PSch, PEnv, hSO, VSO)
+	myMP2Bath = MP2Bath(tSO, FIndex, BIndex, EIndex, PSch, PEnv, hSO, VSO)
 	H0, H1, H2 = myMP2Bath.CalcH()
 	H0.tofile("H0")
 	H1.tofile("H1")
