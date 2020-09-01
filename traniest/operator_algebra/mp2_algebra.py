@@ -700,7 +700,7 @@ class MP2Bath:
 								A[ij, pqrs] = self.CalcAElements(['id', 'jd', 'p', 'r'], ['i', 'j', 's', 'q'], ['id', 'i', 'jd', 'j', 'p', 'r', 's', 'q'], [i, i, j, j, p, r, s, q], FixedCrS = ['id', 'jd', 'p', 'r'], FixedAnS = ['i', 'j', 's', 'q'], Case = 'MF')
 								A[ij, pqrs] += self.CalcAElements(['id', 'jd', 'p', 'r', 'v', 'w'], ['i', 'j', 's', 'q', 'u', 't'], ['id', 'i', 'jd', 'j', 'p', 'r', 's', 'q', 'v', 'w', 'u', 't'], [i, i, j, j, p, r, s, q], FixedCrS = ['id', 'jd', 'p', 'r'], FixedAnS = ['i', 'j', 's', 'q'], Case = 'Right')
 								A[ij, pqrs] += self.CalcAElements(['t', 'u', 'id', 'jd', 'p', 'r'], ['w', 'v', 'i', 'j', 's', 'q'], ['t', 'u', 'w', 'v', 'id', 'i', 'jd', 'j', 'p', 'r', 's', 'q'], [i, i, j, j, p, r, s, q], FixedCrS = ['id', 'jd', 'p', 'r'], FixedAnS = ['i', 'j', 's', 'q'], Case = 'Left')
-		#ijkl - Case 2
+		# ijkl - Case 2
 		for i in self.SIndex:
 			for j in self.SIndex:
 				for k in self.SIndex:
@@ -942,7 +942,17 @@ class MP2Bath:
 	def CalcH(self):
 		Y = self.CalcY()
 		A = self.CalcA()
-		H = np.linalg.solve(A, Y)
+		u, s, v = np.linalg.svd(A)
+		print(A)
+		print(s)
+		A.tofile("A")
+		s.tofile("SingularValues")
+		print("Singular Values Total: ", s.shape)
+		print("Rank of A: ", (s > 1e-9).sum())
+		AATInv = np.linalg.inv(np.dot(A, A.T))
+		APseudoInv = np.dot(A, AATInv)
+		H = np.dot(APseudoInv, Y)
+		#H = np.linalg.solve(A, Y)
 		NS = len(self.SIndex)
 		H0 = 0.0
 		H1 = np.zeros((NS, NS))
