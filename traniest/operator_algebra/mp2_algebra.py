@@ -779,7 +779,7 @@ class MP2Bath:
 									ConOrbsEL = ContractionIndexToOrbitals(ConEL, OrbitalList1L)
 									ExpSL = CalcWickTerms(ConOrbsSL, PorQSL, SignsSL, self.PS, self.QS)
 									ExpEL = CalcWickTerms(ConOrbsEL, PorQEL, SignsEL, self.PE, self.QE)
-									ExpSEL = float(SignL) * ExpSR * ExpER								
+									ExpSEL = float(SignL) * ExpSL * ExpEL
 									
 									Ypq += self.t[t, u, v, w] * (ExpSER + ExpSEL)
 					Ypq *= self.h[p, q]
@@ -838,7 +838,7 @@ class MP2Bath:
 											ConOrbsEL = ContractionIndexToOrbitals(ConEL, OrbitalList2L)
 											ExpSL = CalcWickTerms(ConOrbsSL, PorQSL, SignsSL, self.PS, self.QS)
 											ExpEL = CalcWickTerms(ConOrbsEL, PorQEL, SignsEL, self.PE, self.QE)
-											ExpSEL = float(SignL) * ExpSR * ExpER											
+											ExpSEL = float(SignL) * ExpSL * ExpEL
 
 											Ypqrs += self.t[t, u, v, w] * (ExpSER + ExpSEL)
 							Ypqrs *= self.V[p, q, r, s]
@@ -943,18 +943,11 @@ class MP2Bath:
 		Y = self.CalcY()
 		A = self.CalcA()
 		u, s, v = np.linalg.svd(A)
-		print(A)
 		print(s)
-		A.tofile("A")
 		s.tofile("SingularValues")
 		print("Singular Values Total: ", s.shape)
 		print("Rank of A: ", (s > 1e-9).sum())
-		QR = np.linalg.qr(A.T)[1]
-		QRProj = np.sum(QR, axis = 1)
-		QRProj = abs(ORProj)
-		A = A[QRProj > 1e-9,:]
-		AATInv = np.linalg.inv(np.dot(A, A.T))
-		APseudoInv = np.dot(A, AATInv)
+		APseudoInv = np.linalg.pinv(A)
 		H = np.dot(APseudoInv, Y)
 		#H = np.linalg.solve(A, Y)
 		NS = len(self.SIndex)
@@ -1071,15 +1064,15 @@ if __name__ == '__main__':
 	BIndex = SIndex[int(len(SIndex)/2):]
 	EIndex = list(range(PEnv.shape[0]))
 	
-	#tZero = np.zeros((Norb, Norb, Norb, Norb))
-	#testMFBath = MP2Bath(tZero, SIndex, EIndex, PSch, PEnv, hSO, VSO)
-	#mf0, mf1, mf2 = testMFBath.CalcH()
-	#mf0.tofile("mf0")
-	#mf1.tofile("mf1")
-	#mf2.tofile("mf2")
+	tZero = np.zeros((Norb, Norb, Norb, Norb))
+	testMFBath = MP2Bath(tZero, FIndex, BIndex, EIndex, PSch, PEnv, hSO, VSO)
+	mf0, mf1, mf2 = testMFBath.CalcH()
+	mf0.tofile("mf0")
+	mf1.tofile("mf1")
+	mf2.tofile("mf2")
 
-	myMP2Bath = MP2Bath(tSO, FIndex, BIndex, EIndex, PSch, PEnv, hSO, VSO)
-	H0, H1, H2 = myMP2Bath.CalcH()
-	H0.tofile("H0")
-	H1.tofile("H1")
-	H2.tofile("H2")
+	#myMP2Bath = MP2Bath(tSO, FIndex, BIndex, EIndex, PSch, PEnv, hSO, VSO)
+	#H0, H1, H2 = myMP2Bath.CalcH()
+	#H0.tofile("H0")
+	#H1.tofile("H1")
+	#H2.tofile("H2")
