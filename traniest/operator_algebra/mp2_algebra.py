@@ -949,6 +949,10 @@ class MP2Bath:
 		s.tofile("SingularValues")
 		print("Singular Values Total: ", s.shape)
 		print("Rank of A: ", (s > 1e-9).sum())
+		QR = np.linalg.qr(A.T)[1]
+		QRProj = np.sum(QR, axis = 1)
+		QRProj = abs(ORProj)
+		A = A[QRProj > 1e-9,:]
 		AATInv = np.linalg.inv(np.dot(A, A.T))
 		APseudoInv = np.dot(A, AATInv)
 		H = np.dot(APseudoInv, Y)
