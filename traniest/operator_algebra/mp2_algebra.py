@@ -728,30 +728,19 @@ class MP2Bath:
 		return A
 
 	def CalcYElements(self, NormalOrder1, CrSymbols1, AnSymbols1, ProjectorOrbitalList):
-		SymbolsS1, SymbolsE1 = GenerateSubspaceCases(CrSymbols1 + ['p'], AnSymbols1 + ['q'], FixedCrA = CrSymbols1, FixedAnA = AnSymbols1)
+		SymbolsS1MF, SymbolsE1MF = GenerateSubspaceCases(CrSymbols1 + ['p'], AnSymbols1 + ['q'], FixedCrA = CrSymbols1, FixedAnA = AnSymbols1)
+		SymbolsS1R, SymbolsE1R = GenerateSubspaceCases(CrSymbols1 + ['p', 'v', 'w'], AnSymbols1 + ['q', 'u', 't'], FixedCrA = CrSymbols1, FixedAnA = AnSymbols1)
+		SymbolsS1L, SymbolsE1L = GenerateSubspaceCases(CrSymbols1 + ['p', 't', 'u'], AnSymbols1 + ['q', 'w', 'v'], FixedCrA = CrSymbols1, FixedAnA = AnSymbols1)
 		YElement = 0.0
 
-		for n in range(len(SymbolsS1)):
+		for n in range(len(SymbolsS1MF)):
 			NormalOrder1MF = NormalOrder1 + ['p', 'q']
-			PosSMF, PosEMF = CaseToOperatorPositions(SymbolsS1[n], SymbolsE1[n], NormalOrder1MF)
+			PosSMF, PosEMF = CaseToOperatorPositions(SymbolsS1MF[n], SymbolsE1MF[n], NormalOrder1MF)
 			SignMF = SignOfSeparation(PosEMF[0] + PosEMF[1])
 			ConSMF, PorQSMF, SignsSMF = WickContraction(PosSMF[0], PosSMF[1])
 			ConEMF, PorQEMF, SignsEMF = WickContraction(PosEMF[0], PosEMF[1])
 
-			NormalOrder1R  = NormalOrder1 + ['p', 'q', 'v', 'w', 'u', 't']	
-			PosSR, PosER = CaseToOperatorPositions(SymbolsS1[n], SymbolsE1[n], NormalOrder1R)
-			SignR = SignOfSeparation(PosER[0] + PosER[1])
-			ConSR, PorQSR, SignsSR = WickContraction(PosSR[0], PosSR[1])
-			ConER, PorQER, SignsER = WickContraction(PosER[0], PosER[1])
-
-			NormalOrder1L  = ['t', 'u', 'w', 'v'] + NormalOrder1 + ['p', 'q']
-			PosSL, PosEL = CaseToOperatorPositions(SymbolsS1[n], SymbolsE1[n], NormalOrder1L)
-			SignL = SignOfSeparation(PosEL[0] + PosEL[1])
-			ConSL, PorQSL, SignsSL = WickContraction(PosSL[0], PosSL[1])
-			ConEL, PorQEL, SignsEL = WickContraction(PosEL[0], PosEL[1])
-
-			pIndices, qIndices = self.GetPQIndices(SymbolsS1[n])
-			tIndices, uIndices, vIndices, wIndices = self.GetAmplitudeIndices(SymbolsS1[n])
+			pIndices, qIndices = self.GetPQIndices(SymbolsS1MF[n])
 			for p in pIndices:
 				for q in qIndices:
 					Ypq = 0.0
@@ -763,6 +752,29 @@ class MP2Bath:
 					ExpEMF = CalcWickTerms(ConOrbsEMF, PorQEMF, SignsEMF, self.PE, self.QE)
 					ExpSEMF = float(SignMF) * ExpSMF * ExpEMF
 					Ypq = ExpSEMF
+					
+					Ypq *= self.h[p, q]
+					YElement += Ypq
+
+		for n in range(len(SymbolsS1R)):
+			NormalOrder1R  = NormalOrder1 + ['p', 'q', 'v', 'w', 'u', 't']	
+			PosSR, PosER = CaseToOperatorPositions(SymbolsS1R[n], SymbolsE1R[n], NormalOrder1R)
+			SignR = SignOfSeparation(PosER[0] + PosER[1])
+			ConSR, PorQSR, SignsSR = WickContraction(PosSR[0], PosSR[1])
+			ConER, PorQER, SignsER = WickContraction(PosER[0], PosER[1])
+
+			NormalOrder1L  = ['t', 'u', 'w', 'v'] + NormalOrder1 + ['p', 'q']
+			PosSL, PosEL = CaseToOperatorPositions(SymbolsS1L[n], SymbolsE1L[n], NormalOrder1L)
+			SignL = SignOfSeparation(PosEL[0] + PosEL[1])
+			ConSL, PorQSL, SignsSL = WickContraction(PosSL[0], PosSL[1])
+			ConEL, PorQEL, SignsEL = WickContraction(PosEL[0], PosEL[1])
+
+			pIndices, qIndices = self.GetPQIndices(SymbolsS1R[n])
+			tIndices, uIndices, vIndices, wIndices = self.GetAmplitudeIndices(SymbolsS1R[n])
+			for p in pIndices:
+				for q in qIndices:
+					Ypq = 0.0
+					OrbitalList1MF = ProjectorOrbitalList + [p, q]
 					for t in tIndices:
 						for u in uIndices:
 							for v in vIndices:
@@ -773,7 +785,20 @@ class MP2Bath:
 									ExpSR = CalcWickTerms(ConOrbsSR, PorQSR, SignsSR, self.PS, self.QS)
 									ExpER = CalcWickTerms(ConOrbsER, PorQER, SignsER, self.PE, self.QE)
 									ExpSER = float(SignR) * ExpSR * ExpER
+									
+									Ypq += self.t[t, u, v, w] * ExpSER
+					Ypq *= self.h[p, q]
+					YElement += Ypq
 
+			pIndices, qIndices = self.GetPQIndices(SymbolsS1L[n])
+			tIndices, uIndices, vIndices, wIndices = self.GetAmplitudeIndices(SymbolsS1L[n])
+			for p in pIndices:
+				for q in qIndices:
+					Ypq = 0.0
+					for t in tIndices:
+						for u in uIndices:
+							for v in vIndices:
+								for w in wIndices:
 									OrbitalList1L = [t, u, w, v] + OrbitalList1MF
 									ConOrbsSL = ContractionIndexToOrbitals(ConSL, OrbitalList1L)
 									ConOrbsEL = ContractionIndexToOrbitals(ConEL, OrbitalList1L)
@@ -781,33 +806,22 @@ class MP2Bath:
 									ExpEL = CalcWickTerms(ConOrbsEL, PorQEL, SignsEL, self.PE, self.QE)
 									ExpSEL = float(SignL) * ExpSL * ExpEL
 									
-									Ypq += self.t[t, u, v, w] * (ExpSER + ExpSEL)
+									Ypq += self.t[t, u, v, w] * ExpSEL
 					Ypq *= self.h[p, q]
 					YElement += Ypq
 
-		SymbolsS2, SymbolsE2 = GenerateSubspaceCases(CrSymbols1 + ['p', 'r'], AnSymbols1 + ['s', 'q'], FixedCrA = CrSymbols1, FixedAnA = AnSymbols1)
-		for n in range(len(SymbolsS2)):
+		SymbolsS2MF, SymbolsE2MF = GenerateSubspaceCases(CrSymbols1 + ['p', 'r'], AnSymbols1 + ['s', 'q'], FixedCrA = CrSymbols1, FixedAnA = AnSymbols1)
+		SymbolsS2R, SymbolsE2R = GenerateSubspaceCases(CrSymbols1 + ['p', 'r', 'v', 'w'], AnSymbols1 + ['s', 'q', 'u', 't'], FixedCrA = CrSymbols1, FixedAnA = AnSymbols1)
+		SymbolsS2L, SymbolsE2L = GenerateSubspaceCases(CrSymbols1 + ['p', 'r', 't', 'u'], AnSymbols1 + ['s', 'q', 'w', 'v'], FixedCrA = CrSymbols1, FixedAnA = AnSymbols1)
+		for n in range(len(SymbolsS2MF)):
 			NormalOrder2MF = NormalOrder1 + ['p', 'r', 's', 'q']
-			PosSMF, PosEMF = CaseToOperatorPositions(SymbolsS2[n], SymbolsE2[n], NormalOrder2MF)
+			PosSMF, PosEMF = CaseToOperatorPositions(SymbolsS2MF[n], SymbolsE2MF[n], NormalOrder2MF)
 			SignMF = SignOfSeparation(PosEMF[0] + PosEMF[1])
 			ConSMF, PorQSMF, SignsSMF = WickContraction(PosSMF[0], PosSMF[1])
 			ConEMF, PorQEMF, SignsEMF = WickContraction(PosEMF[0], PosEMF[1])
 
-			NormalOrder2R  = NormalOrder2MF + ['v', 'w', 'u', 't']	
-			PosSR, PosER = CaseToOperatorPositions(SymbolsS2[n], SymbolsE2[n], NormalOrder2R)
-			SignR = SignOfSeparation(PosER[0] + PosER[1])
-			ConSR, PorQSR, SignsSR = WickContraction(PosSR[0], PosSR[1])
-			ConER, PorQER, SignsER = WickContraction(PosER[0], PosER[1])
-
-			NormalOrder2L  = ['t', 'u', 'w', 'v'] + NormalOrder2MF
-			PosSL, PosEL = CaseToOperatorPositions(SymbolsS2[n], SymbolsE2[n], NormalOrder2L)
-			SignL = SignOfSeparation(PosEL[0] + PosEL[1])
-			ConSL, PorQSL, SignsSL = WickContraction(PosSL[0], PosSL[1])
-			ConEL, PorQEL, SignsEL = WickContraction(PosEL[0], PosEL[1])
-
-			pIndices, qIndices = self.GetPQIndices(SymbolsS2[n])
-			rIndices, sIndices = self.GetRSIndices(SymbolsS2[n])
-			tIndices, uIndices, vIndices, wIndices = self.GetAmplitudeIndices(SymbolsS2[n])
+			pIndices, qIndices = self.GetPQIndices(SymbolsS2MF[n])
+			rIndices, sIndices = self.GetRSIndices(SymbolsS2MF[n])
 			for p in pIndices:
 				for q in qIndices:
 					for r in rIndices:
@@ -822,6 +836,34 @@ class MP2Bath:
 							ExpSEMF = float(SignMF) * ExpSMF * ExpEMF
 							Ypqrs = ExpSEMF
 
+							Ypqrs *= self.V[p, q, r, s]
+							YElement += Ypqrs
+
+		for n in range(len(SymbolsS2R)):
+			NormalOrder2MF = NormalOrder1 + ['p', 'r', 's', 'q']
+
+			NormalOrder2R  = NormalOrder2MF + ['v', 'w', 'u', 't']	
+			PosSR, PosER = CaseToOperatorPositions(SymbolsS2R[n], SymbolsE2R[n], NormalOrder2R)
+			SignR = SignOfSeparation(PosER[0] + PosER[1])
+			ConSR, PorQSR, SignsSR = WickContraction(PosSR[0], PosSR[1])
+			ConER, PorQER, SignsER = WickContraction(PosER[0], PosER[1])
+
+			NormalOrder2L  = ['t', 'u', 'w', 'v'] + NormalOrder2MF
+			PosSL, PosEL = CaseToOperatorPositions(SymbolsS2L[n], SymbolsE2L[n], NormalOrder2L)
+			SignL = SignOfSeparation(PosEL[0] + PosEL[1])
+			ConSL, PorQSL, SignsSL = WickContraction(PosSL[0], PosSL[1])
+			ConEL, PorQEL, SignsEL = WickContraction(PosEL[0], PosEL[1])
+
+			pIndices, qIndices = self.GetPQIndices(SymbolsS2R[n])
+			rIndices, sIndices = self.GetRSIndices(SymbolsS2R[n])
+			tIndices, uIndices, vIndices, wIndices = self.GetAmplitudeIndices(SymbolsS2R[n])
+			for p in pIndices:
+				for q in qIndices:
+					for r in rIndices:
+						for s in sIndices:
+							Ypqrs = 0.0
+							# MF Case
+							OrbitalList2MF = ProjectorOrbitalList + [p, r, s, q]
 							for t in tIndices:
 								for u in uIndices:
 									for v in vIndices:
@@ -833,6 +875,24 @@ class MP2Bath:
 											ExpER = CalcWickTerms(ConOrbsER, PorQER, SignsER, self.PE, self.QE)
 											ExpSER = float(SignR) * ExpSR * ExpER
 
+											Ypqrs += self.t[t, u, v, w] * ExpSER
+							Ypqrs *= self.V[p, q, r, s]
+							YElement += Ypqrs
+
+			pIndices, qIndices = self.GetPQIndices(SymbolsS2L[n])
+			rIndices, sIndices = self.GetRSIndices(SymbolsS2L[n])
+			tIndices, uIndices, vIndices, wIndices = self.GetAmplitudeIndices(SymbolsS2L[n])
+			for p in pIndices:
+				for q in qIndices:
+					for r in rIndices:
+						for s in sIndices:
+							Ypqrs = 0.0
+							# MF Case
+							OrbitalList2MF = ProjectorOrbitalList + [p, r, s, q]
+							for t in tIndices:
+								for u in uIndices:
+									for v in vIndices:
+										for w in wIndices:
 											OrbitalList2L = [t, u, w, v] + OrbitalList2MF
 											ConOrbsSL = ContractionIndexToOrbitals(ConSL, OrbitalList2L)
 											ConOrbsEL = ContractionIndexToOrbitals(ConEL, OrbitalList2L)
@@ -840,9 +900,10 @@ class MP2Bath:
 											ExpEL = CalcWickTerms(ConOrbsEL, PorQEL, SignsEL, self.PE, self.QE)
 											ExpSEL = float(SignL) * ExpSL * ExpEL
 
-											Ypqrs += self.t[t, u, v, w] * (ExpSER + ExpSEL)
+											Ypqrs += self.t[t, u, v, w] * ExpSEL
 							Ypqrs *= self.V[p, q, r, s]
 							YElement += Ypqrs
+
 		return YElement
 
 	def CalcY(self):
@@ -940,7 +1001,9 @@ class MP2Bath:
 		return Y
 
 	def CalcH(self):
+		print("Calculating Y...")
 		Y = self.CalcY()
+		print("... done")
 		A = self.CalcA()
 		u, s, v = np.linalg.svd(A)
 		print(s)
