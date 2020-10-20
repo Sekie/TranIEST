@@ -665,19 +665,31 @@ class MP2Bath:
 		# pqrs - Case 0
 		A[0, 0] = 1.0 # Might not be normalized. Need to check on this.
 		# pqrs - Case 1
+		testfull = 0.0
+		testpq = 0.0
 		for p in self.SIndex:
 			for q in self.SIndex:
 				pq = self.CombinedIndex([p, q])
+				print("pq", p, q)
 				A[0, pq] = self.CalcAElements(['p'], ['q'], ['p', 'q'], [p, q], FixedCrS = ['p'], FixedAnS = ['q'], Case = 'MF')
 				A[0, pq] += self.CalcAElements(['p', 'v', 'w'], ['q', 'u', 't'], ['p', 'q', 'v', 'w', 'u', 't'], [p, q], FixedCrS = ['p'], FixedAnS = ['q'], Case = 'Right')
+				tpq = self.CalcAElements(['p', 'v', 'w'], ['q', 'u', 't'], ['p', 'q', 'v', 'w', 'u', 't'], [p, q], FixedCrS = ['p'], FixedAnS = ['q'], Case = 'Right')
+				print("tpq = ", tpq)
+				testpq += tpq
 				A[0, pq] += self.CalcAElements(['p', 't', 'u'], ['q', 'v', 'w'], ['t', 'u', 'w', 'v', 'p', 'q'], [p, q], FixedCrS = ['p'], FixedAnS = ['q'], Case = 'Left')
+				print("A0pq = ", A[0, pq])
 				# pqrs - Case 2
 				for r in self.SIndex:
 					for s in self.SIndex:
 						pqrs = self.CombinedIndex([p, q, r, s])
+						print("pqrs",p,q,r,s)
 						A[0, pqrs] = self.CalcAElements(['p', 'r'], ['s', 'q'], ['p', 'r', 's', 'q'], [p, r, s, q], FixedCrS = ['p', 'r'], FixedAnS = ['s', 'q'], Case = 'MF')
 						A[0, pqrs] += self.CalcAElements(['p', 'r', 'v', 'w'], ['s', 'q', 'u', 't'], ['p', 'r', 's', 'q', 'v', 'w', 'u', 't'], [p, r, s, q], FixedCrS = ['p', 'r'], FixedAnS = ['s', 'q'], Case = 'Right')
+						test = self.CalcAElements(['p', 'r', 'v', 'w'], ['s', 'q', 'u', 't'], ['p', 'r', 's', 'q', 'v', 'w', 'u', 't'], [p, r, s, q], FixedCrS = ['p', 'r'], FixedAnS = ['s', 'q'], Case = 'Right')
+						print(test)
+						testfull += test
 						A[0, pqrs] += self.CalcAElements(['p', 'r', 't', 'u'], ['s', 'q', 'v', 'w'], ['t', 'u', 'w', 'v', 'p', 'r', 's', 'q'], [p, r, s, q], FixedCrS = ['p', 'r'], FixedAnS = ['s', 'q'], Case = 'Left')
+		print("MP2 Test Element = ", testpq, testfull)
 		# ijkl - Case 1
 		for i in self.SIndex:
 			for j in self.SIndex:
@@ -723,8 +735,8 @@ class MP2Bath:
 									for s in self.SIndex:	
 										pqrs = self.CombinedIndex([p, q, r, s])
 										A[ijkl, pqrs] = self.CalcAElements(['id', 'jd', 'kd', 'ld', 'p', 'r'], ['i', 'j', 'k', 'l', 's', 'q'], ['id', 'i', 'jd', 'j', 'kd', 'k', 'ld', 'l', 'p', 'r', 's', 'q'], [i, i, j, j, k, k, l, l, p, r, s, q], FixedCrS = ['id', 'jd', 'kd', 'ld', 'p', 'r'], FixedAnS = ['i', 'j', 'k', 'l', 's', 'q'], Case = 'MF')
-										A[ijkl, pq] += self.CalcAElements(['id', 'jd', 'kd', 'ld', 'p', 'r', 'v', 'w'], ['i', 'j', 'k', 'l', 's', 'q', 'u', 't'], ['id', 'i', 'jd', 'j', 'kd', 'k', 'ld', 'l', 'p', 'r', 's', 'q', 'v', 'w', 'u', 't'], [i, i, j, j, k, k, l, l, p, r, s, q], FixedCrS = ['id', 'jd', 'kd', 'ld', 'p', 'r'], FixedAnS = ['i', 'j', 'k', 'l', 's', 'q'], Case = 'Right')
-										A[ijkl, pq] += self.CalcAElements(['t', 'u', 'id', 'jd', 'kd', 'ld', 'p', 'r'], ['w', 'v', 'i', 'j', 'k', 'l', 's', 'q'], ['t', 'u', 'w', 'v', 'id', 'i', 'jd', 'j', 'kd', 'k', 'ld', 'l', 'p', 'r', 's', 'q'], [i, i, j, j, k, k, l, l, p, r, s, q], FixedCrS = ['id', 'jd', 'kd', 'ld', 'p', 'r'], FixedAnS = ['i', 'j', 'k', 'l', 's', 'q'], Case = 'Left')
+										A[ijkl, pqrs] += self.CalcAElements(['id', 'jd', 'kd', 'ld', 'p', 'r', 'v', 'w'], ['i', 'j', 'k', 'l', 's', 'q', 'u', 't'], ['id', 'i', 'jd', 'j', 'kd', 'k', 'ld', 'l', 'p', 'r', 's', 'q', 'v', 'w', 'u', 't'], [i, i, j, j, k, k, l, l, p, r, s, q], FixedCrS = ['id', 'jd', 'kd', 'ld', 'p', 'r'], FixedAnS = ['i', 'j', 'k', 'l', 's', 'q'], Case = 'Right')
+										A[ijkl, pqrs] += self.CalcAElements(['t', 'u', 'id', 'jd', 'kd', 'ld', 'p', 'r'], ['w', 'v', 'i', 'j', 'k', 'l', 's', 'q'], ['t', 'u', 'w', 'v', 'id', 'i', 'jd', 'j', 'kd', 'k', 'ld', 'l', 'p', 'r', 's', 'q'], [i, i, j, j, k, k, l, l, p, r, s, q], FixedCrS = ['id', 'jd', 'kd', 'ld', 'p', 'r'], FixedAnS = ['i', 'j', 'k', 'l', 's', 'q'], Case = 'Left')
 		return A
 
 	def CalcYElements(self, NormalOrder1, CrSymbols1, AnSymbols1, ProjectorOrbitalList):
@@ -1001,10 +1013,10 @@ class MP2Bath:
 		return Y
 
 	def CalcH(self):
+		A = self.CalcA()
 		print("Calculating Y...")
 		Y = self.CalcY()
 		print("... done")
-		A = self.CalcA()
 		u, s, v = np.linalg.svd(A)
 		print(s)
 		s.tofile("SingularValues")
@@ -1066,13 +1078,13 @@ if __name__ == '__main__':
 	mol.atom = []
 	for i in range(N):
 		angle = i / N * 2.0 * np.pi
-		if i == 1:
-			angle = angle + 0.8 * angle
+	#	if i == 1:
+	#		angle = angle + 0.8 * angle
 		mol.atom.append(('H', (r * np.sin(angle), r * np.cos(angle), 0)))
 	mol.basis = 'sto-3g'
 	mol.build(verbose = 0)
 	mf = scf.RHF(mol).run()
-	
+
 	S = mol.intor_symmetric("int1e_ovlp")
 	mo_coeff = mf.mo_coeff
 	StoOrth = get_symm_mat_pow(S, 0.50)
@@ -1108,34 +1120,129 @@ if __name__ == '__main__':
 	hSO = reduce(np.dot, (TTotal.T, mf.get_hcore(), TTotal))
 	VSO = ao2mo.kernel(mol, TTotal)
 	VSO = ao2mo.restore(1, VSO, hSO.shape[0])
+	hMO = reduce(np.dot, (mo_coeff.T, mf.get_hcore(), mo_coeff))
+	VMO = ao2mo.kernel(mol, mo_coeff) #np.eye(TTotal.shape[0]))
+	VMO = ao2mo.restore(1, VMO, hMO.shape[0])
+	#print(mo_coeff)
+	#print(0, 0, 0, 0, mol.get_enuc())
+	#for i in range(hMO.shape[0]):
+	#	for j in range(hMO.shape[1]):
+	#		if abs(hMO[i, j]) < 1e-9:
+	#			elem = 0.0
+	#		else:
+	#			elem = hMO[i,j]
+	#		print(i+1, j+1, 0, 0, elem)
+	#for i in range(VMO.shape[0]):
+	#	for j in range(VMO.shape[1]):
+	#		for k in range(VMO.shape[2]):
+	#			for l in range(VMO.shape[3]):
+	#				if abs(VMO[i,j,k,l]) < 1e-9:
+	#					elem = 0
+	#				else:
+	#					elem = VMO[i, j, k, l]
+	#				print(i+1, j+1, k+1, l+1, elem)
 
 	mp2 = mp.MP2(mf)
-	E, t2 = mp2.kernel()
+	E, T2 = mp2.kernel()
+	print("E(MP2) = ", mf.energy_elec()[0], E)
 
-	Nocc = t2.shape[0]
-	Nvir = t2.shape[2]
+	Nocc = T2.shape[0]
+	Nvir = T2.shape[2]
 	Norb = Nocc + Nvir
+	print(T2.shape)
+	t2 = np.zeros((Nocc, Nocc, Nvir, Nvir))
+	for i in range(Nocc):
+		for j in range(Nocc):
+			for a in range(Nvir):
+				for b in range(Nvir):
+					t2[i, j, a, b] = 2.0 * T2[i, j, a, b] - T2[i, j, b, a]
+	#t2 = T2
 	tMO = np.zeros((Norb, Norb, Norb, Norb))
 	tMO[:Nocc, :Nocc, Nocc:, Nocc:] = t2
+
+	#tDBG = np.zeros((Norb, Norb, Norb, Norb))
+	#tDBG[Nocc - 1, Nocc - 1, Nocc, Nocc] = 1.0
+	#PMO = np.zeros((Norb, Norb))
+	#for i in range(Nocc):
+	#	PMO[i, i] = 1.0
+	#PEDBG = np.zeros((0, 0))
+	#FIndexDBG = [0, 1, 2, 3]
+	#myMP2DBG = MP2Bath(tDBG, FIndexDBG, [], FIndexDBG, PMO, PMO, hMO, VMO)
+	#myMP2DBG.CalcH()
+	
 
 	#tLO = np.einsum('ia,jb,kc,ld,ijkl->abcd', StoOrth, StoOrth, StoOrth, StoOrth, tMO)
 	#tSO = np.einsum('ap,bq,cr,ds,abcd->pqrs', T, T, T, T, tLO)
 	tSO = np.einsum('ap,bq,cr,ds,abcd->pqrs', TTotal, TTotal, TTotal, TTotal, tMO)
 
+	print(np.dot(T.T, T))
+	#hForFCI = np.zeros((4,4))
+	#hForFCI[3, 3] = 1.0
+	#hForFCI = reduce(np.dot, (T, hForFCI, T.T))
+	#for i in range(hForFCI.shape[0]):
+	#	for j in range(i, hForFCI.shape[1]):
+	#		print(i + 1, j + 1, 0, 0, hForFCI[i, j])
+	#VForFCI = np.zeros((4,4,4,4))
+	#VForFCI[0,0,0,0] = 1.0
+	#VForFCI = np.einsum('ap,bq,cr,ds,abcd->pqrs', T.T, T.T, T.T, T.T, VForFCI)
+	#for i in range(N):
+	#	for j in range(i, N):
+	#		for k in range(j, N):
+	#			for l in range (k, N):
+	#				print(i+1,j+1,k+1,l+1,VForFCI[i,j,k,l])
+	X = np.zeros((6,6))
+	def toXidx(i, a):
+		idx = 0
+		if i == 0:
+			if a == 0:
+				idx = 3
+			if a == 1:
+				idx = 4
+		if i == 1:
+			if a == 0:
+				idx = 1
+			if a == 1:
+				idx = 2
+		return idx
+
+	#for i in range(t2.shape[0]):
+	#	for a in range(t2.shape[2]):
+	#		for j in range(t2.shape[1]):
+	#			for b in range(t2.shape[3]):
+	#				Xa = toXidx(i, a)
+	#				Xb = toXidx(j, b)
+	#				X[Xa, Xb] = t2[i, j, a, b]
+	X[1, 1] = t2[1, 1, 0, 0]
+	X[1, 2] = t2[1, 1, 0, 1]
+	X[1, 3] = t2[0, 1, 0, 0]
+	X[1, 4] = t2[0, 1, 0, 1]
+	X[2, 2] = t2[1, 1, 1, 1]
+	X[2, 3] = t2[0, 1, 0, 1]
+	X[2, 4] = t2[0, 1, 1, 1]
+	X[3, 3] = t2[0, 0, 0, 0]
+	X[3, 4] = t2[0, 0, 0, 1]
+	X[4, 4] = t2[0, 0, 1, 1]
+	X[0, 5] = t2[0, 1, 0, 1]
+	for i in range(X.shape[0]):
+		for j in range(i):
+			X[i, j] = X.T[i, j]
+	print("X")
+	print(t2[0, 0, 0, 1])
+	print(t2[0, 0, 1, 0])
+	print(X)
+	np.savetxt("X", X, delimiter = '\t')
+			
 	SIndex = list(range(PSch.shape[0]))
 	FIndex = SIndex[:int(len(SIndex)/2)]
 	BIndex = SIndex[int(len(SIndex)/2):]
 	EIndex = list(range(PEnv.shape[0]))
 	
-	tZero = np.zeros((Norb, Norb, Norb, Norb))
-	testMFBath = MP2Bath(tZero, FIndex, BIndex, EIndex, PSch, PEnv, hSO, VSO)
-	mf0, mf1, mf2 = testMFBath.CalcH()
-	mf0.tofile("mf0")
-	mf1.tofile("mf1")
-	mf2.tofile("mf2")
+	#tZero = np.zeros((Norb, Norb, Norb, Norb))
+	#testMFBath = MP2Bath(tZero, FIndex, BIndex, EIndex, PSch, PEnv, hSO, VSO)
+	#mf0, mf1, mf2 = testMFBath.CalcH()
+	#mf0.tofile("mf0")
+	#mf1.tofile("mf1")
+	#mf2.tofile("mf2")
 
-	#myMP2Bath = MP2Bath(tSO, FIndex, BIndex, EIndex, PSch, PEnv, hSO, VSO)
-	#H0, H1, H2 = myMP2Bath.CalcH()
-	#H0.tofile("H0")
-	#H1.tofile("H1")
-	#H2.tofile("H2")
+	myMP2Bath = MP2Bath(tSO, FIndex, BIndex, EIndex, PSch, PEnv, hSO, VSO)
+	H0, H1, H2 = myMP2Bath.CalcH()
