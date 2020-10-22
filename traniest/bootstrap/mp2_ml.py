@@ -9,45 +9,92 @@ def GetFock(h, V):
 
 def GetG(F):
 	e, v = np.linalg.eigh(F)
+	return e
+def FragmentRHF(hEff, VEff, FIndices):
+	mol = gto.M()
+	nElec = hEff.shape[0] # Half occupied fragment
+	mol.nelectron = nElec
 
-def ERIToVector(h, V):
-	n = h.shape[0]
-	hVec = h.reshape(n * n)
-	VVec = V.reshape(n * n * n * n)
-	ERIVec = np.vstack((hVec, VVec))
-	return ERIVec
+	mf = scf.RHF(mol)
+	mf.get_hcore = lambda *args: hEff
+	mf.get_ovlp = lambda *args: np.eye(nElec)
+	mf._eri = ao2mo.restore(8, VEff, nElec)
 
-def VectorToERI(ERIVec, n):
-	hVec = ERIVec[:(n * n)]
-	VVec = ERIVec[(n * n):]
-	h = hVec.reshape(n, n)
-	V = VVec.reshape(n, n, n, n)
-	return h, V
+	mf.kernel()
+
+	VMOEff = np.einsum('ijkl,ip,jq,kr,ls->pqrs', VEff, mf.mo_coeff, mf.mo_coeff, mf.mo_coeff, mf.mo_coeff)
+	TFrag = mf.mo_coeff.T[FIndices, :]
+	return VMOEff, mf.mo_energy, TFrag
+
+# Takes VEff in the fragment MO basis, and assumes half filling. Returns a four index array where the first two indices
+# are the occupied orbitals and the last two indices are the virtual orbitals
+def MaketEff(VEff, g):
+	nOcc = int(g.shape[0] / 2)
+	n = g.shape[0]
+	tEff = np.zeros((nOcc, nOcc, n - nOcc, n - nOcc))
+	for i in range(nOcc):
+		for j in range(nOcc):
+			for a in range(n - nOcc):
+				for b in range(n - nOcc):
+					tEff[i, j, a, b] = VEff[i, j, nOcc + a, nOcc + b] / (g[i] + g[j] - g[nOcc + a] - g[nOcc + b])
+	return tEff
 	
+def ERIToVector(V):
+	n = V.shape[0]
+	#hVec = h.reshape(n * n)
+	VVec = V.reshape(n * n * n * n)
+	#ERIVec = np.vstack((hVec, VVec))
+	return VVec
 
-def TWoConditionsOOVV(VSO_VVVV, tSO, SIndices):
-	Cond = np.einsum('abcd,ijcd->ijab', VSO_VVVV, tSO)
-	CondS = Cond[SIndices, :, :, :][:, SIndices, :, :][:, :, SIndices, :][:, :, :, SIndices]
-	return CondS
+def VectorToERI(ERIVec):
+	#n2 = int(n * n)
+	#hVec = ERIVec[:n2]
+	#VVec = ERIVec[n2:]
+	#h = hVec.reshape(n, n)
+	n = int(VVec.shape[0]**0.25)
+	V = VVec.reshape(n, n, n, n)
+	return V
 
-def TwoConditionsOOOO(VSO_OOVV, tSO, SIndices):
-	Cond = np.einsum('klcd,ijcd->ijkl', VSO_OOVV, tSO)
-	CondS = Cond[SIndices, :, :, :][:, SIndices, :, :][:, :, SIndices, :][:, :, :, SIndices]
-	return CondS
+def MakeLossVector(Losses):
+	LossesVec = np.zeros(0)
+	for Loss in Losses:
+		Loss.shape[0] = n1
+		Loss.shape[2] = n2
+		Dim = n1 * n1 + n2 * n2
+		LossVec = np.zeros(Dim)
+		for i in Loss.shape[0]:
+			for j in Loss.shape[1]:
+				for k in Loss.shape[2]:
+					for l in Loss.shape[3]:
+						LossVec[i + j * Loss.shape[0] + k * Loss.shape[0] * Loss.shape[1] + l * Loss.shape[0] * Loss.shape[1] * Loss.shape[3]] = Loss[i, j, k, l]
+		LossesVec = np.concatenate((LossesVec, LossVec))
+	LossVec = np.zeros(Dim)
+	for Loss in Losses:
+		
+	
+def TwoConditionsOOVV(VMO_VVVV, tMO, TFrag):
+	CondMO = np.einsum('abcd,ijcd->ijab', VMO_VVVV, tMO)
+	Cond = np.einsum('ijab,ip,jq,ar,bs->prqs', CondMO, TFrag, TFrag, TFrag, TFrag)
+	return Cond
 
-def TwoConditionsVVVV(VSO_OOVV, tSO, SIndices):
-	Cond = np.einsum('klcd,klab->abcd', VSO_OOVV, tSO)
-	CondS = Cond[SIndices, :, :, :][:, SIndices, :, :][:, :, SIndices, :][:, :, :, SIndices]
-	return CondS
+def TwoConditionsOOOO(VMO_OOVV, tMO, TFrag):
+	CondMO = np.einsum('klcd,ijcd->ijkl', VMO_OOVV, tMO)
+	Cond = np.einsum('ijkl,ip,jq,kr,ls->prqs', CondMO, TFrag, TFrag, TFrag, TFrag)
+	return Cond
 
-def TwoConditionsOOVVMix(VSO_OOVV, tSO, SIndices):
-	Cond = np.einsum('ikac,kjcb->ijab', VSO_OOVV, tSO)
-	CondS = Cond[SIndices, :, :, :][:, SIndices, :, :][:, :, SIndices, :][:, :, :, SIndices]
-	return CondS
+def TwoConditionsVVVV(VMO_OOVV, tMO, TFrag):
+	CondMO = np.einsum('klcd,klab->abcd', VMO_OOVV, tMO)
+	Cond = np.einsum('abcd,ap,bq,cr,ds->prqs', CondMO, TFrag, TFrag, TFrag, TFrag)
+	return Cond
+
+def TwoConditionsOOVVMix(VMO_OOVV, tMO, TFrag):
+	CondMO = np.einsum('ikac,kjcb->ijab', VMO_OOVV, tMO)
+	Cond = np.einsum('ijab,ip,jq,ar,bs->prqs', CondMO, TFrag, TFrag, TFrag, TFrag)
+	return Cond
 
 def OneConditionsOO(VSO_OOVV, tSO, SIndices):
 	Cond = np.einsum('ikcd,jkcd->ij', VSO_OOVV, tSO)
-	CodeS = Cond[SIndices, :][:, SIndices]
+	CondS = Cond[SIndices, :][:, SIndices]
 	return CondS
 
 def OneConditionsVV(VSO_OOVV, tSO, SIndices):
@@ -55,48 +102,53 @@ def OneConditionsVV(VSO_OOVV, tSO, SIndices):
 	CondS = Cond[SIndices, :][:, SIndices]
 	return CondS
 
-def TwoUnknown(hEff, VEff, Nocc):
-	F = GetFock(hEff, VEff)
-	g = GetG(F)
-	Unk = np.einsum('abcd,ijcd->ijab', VEff, VEff)
-	for i in range(Unk.shape[0]):
-		for j in range(Unk.shape[1]):
-			for a in range(Unk.shape[2]):
-				for b in range(Unk.shape[3]):
-					Unk[i, j, a, b] = Unk[i, j, a, b] / (g[i] + g[j] - g[Nocc + a] - g[Nocc + b])
-	return Unk
+def ERIEffectiveToFragMO(hEff, VEff, FIndices):
+	VMOEff, g, TFrag = FragmentRHF(hEff, VEff, FIndices)
+	tEff = MaketEff(VMOEff, g)
+	#nOcc = tEff.shape[0]
+	#nVir = tEff.shape[2]
+	#VMOEff_VVVV = VMOEff[nOcc:, nOcc:, nOcc:, nOcc:]
+	#Unkn = TwoConditionsOOVV(VMOEff_VVVV, tEff, TFrag)
+	return VMOEff, tEff, TFrag
 
-def LossPacked(hEff, VEff, VSO_VVVV, VSO_OOVV, tSO, SIndices):
-	OneCond = OneConditionsOO(VSO_OOVV, tSO, SIndices)
-	TwoCond = TwoConditionsOOVV(VSO_VVVV, tSO, SIndices)
-	Nocc = TwoCond.shape[0]
-	Nvir = TwoCond.shape[2]
-	#OneCondVec = OneCond.reshape(Nocc * Nocc)
-	#TWoCondVec = OneCond.reshape(Nocc * Nocc * Nvirt * Nvirt)
-	TwoUnkn = TwoUnknown(hEff, VEff, Nocc)
-	OneUnkn = np.zeros((Nocc, Nocc))
-	return OneUnkn - OneCond, TwoUnkn - TwoCond
+def LossPacked(VEff, hEff, VMO, tMO, TFrag, FIndices):
+	nOcc = tMO.shape[0]
+	nVir = tMO.shape[2]
+	VMO_VVVV = VMO[nOcc:, nOcc:, nOcc:, nOcc:]
+	VMO_OOVV = VMO[:nOcc, :nOcc, nOcc:, nOcc:]
 	
-def Loss(ERIVec, VSO_VVVV, VSO_OOVV, tSO, SIndices):
-	h, V = VectorToERI(ERIVec, VSO_VVVV.shape[0] / 2)
-	OneLoss, TwoLoss = LossPacked(h, V, VSO_VVVV, VSO_OOVV, tSO, SIndices)
-	LossUnpacked = ERIToVector(OneLoss, TwoLoss)
+	# These give the FF block of the conditions
+	CondOOVV = TwoConditionsOOVV(VMO_VVVV, tMO, TFrag)
+	CondOOOO = TwoConditionsOOOO(VMO_OOVV, tMO, TFrag)
+	CondVVVV = TwoConditionsVVVV(VMO_OOVV, tMO, TFrag)
+	CondOOVVMix = TwoConditionsOOVVMix(VMO_OOVV, tMO, TFrag)
+	
+	# These give the unknowns
+	VMOEff, tEff, TFragEff = ERIEffectiveToFragMO(hEff, VEff, FIndices)
+	nOccEff = tEff.shape[0]
+	nVirEff = tEff.shape[2]
+	VMOEff_VVVV = VMOEff[nOccEff:, nOccEff:, nOccEff:, nOccEff:]
+	VMOEff_OOVV = VMOEff[:nOccEff, :nOccEff, nOccEff:, nOccEff:]
+	UnknOOVV = TwoConditionsOOVV(VMOEff_VVVV, tEff, TFragEff)
+	UnknOOOO = TwoConditionsOOOO(VMOEff_OOVV, tEff, TFragEff)
+	UnknVVVV = TwoConditionsVVVV(VMOEff_OOVV, tEff, TFragEff)
+	UnknOOVVMix = TwoConditionsOOVVMix(VMOEff_OOVV, tEff, TFragEff)
+	
+	Loss = [UnknOOVV - CondOOVV, UnknOOOO - CondOOOO, UnknVVVV - CondVVVV, UnknOOVVMix - CondOOVVMix]
+	return Loss
+	
+def Loss(VEffVec, hEff, VMO, tMO, TFrag, FIndices):
+	VEff = VectorToERI(VEffVec)
+	Losses = LossPacked(VEff, hEff, VMO, tMO, TFrag, FIndices)
+	LossesVec = MakeLossVector(Losses)
 	return LossUnpacked
 
 
-def MP2MLEmbedding(tSO, VSO, g, FBIndices, EIndices):
-	nFBE = tSO.shape[0]
-	nFB = int(len(FBIndices))
-	nE = int(len(EIndices))
-	AllIndices = FBIndices + EIndices
-	Veff = np.zeros((nFB, nFB, nFB, nFB))
-	tV = np.einsum('abcd,ijcd->abij', (VSO, tSO))
-	A = np.zeros((nFB, nFB, nFB, nFB))
-	for i in range(nFB):
-		for j in range(nFB):
-			for a in range(nFBE):
-				for b in range(nFBE):
-					A[i, j, a, b] = 1.0 / (g[i] + g[j] - g[a] - g[b])
+def MP2MLEmbedding(VSO_VVVV, VSO_OOVV, tSO, SIndices, EIndices):
+	N = int(len(SIndices))
+	ERIVec = np.zeros(N**2 + N**4)
+	L = Loss(ERIVec, VSO_VVVV, VSO_OOVV, tSO, SIndices)
+
 def CombinedIndex(Indices, nFB):
 	if len(Indices) == 2:
 		i = Indices[0] + nFB * Indices[1]
@@ -162,10 +214,6 @@ if __name__ == '__main__':
 	VMO = ao2mo.kernel(mol, mo_coeff) #np.eye(TTotal.shape[0]))
 	VMO = ao2mo.restore(1, VMO, hMO.shape[0])
 
-	F = mf.get_fock()
-	FSO = reduce(np.dot, (TTotal.T, mf.get_fock(), TTotal))
-	g = np.diag(FSO)
-
 	mp2 = mp.MP2(mf)
 	E, T2 = mp2.kernel()
 	print("E(MP2) = ", mf.energy_elec()[0], E)
@@ -186,8 +234,14 @@ if __name__ == '__main__':
 
 	tSO = np.einsum('ap,bq,cr,ds,abcd->pqrs', TTotal, TTotal, TTotal, TTotal, tMO)
 
-	VMO_VVVV = np.zeros((Norb, Norb, Norb, Norb))
-	VMO_VVVV[Nocc:, Nocc:, Nocc:, Nocc:] = VMO[Nocc:, Nocc:, Nocc:, Nocc:]
+	#VMO_VVVV = np.zeros((Norb, Norb, Norb, Norb))
+	#VMO_VVVV[Nocc:, Nocc:, Nocc:, Nocc:] = VMO[Nocc:, Nocc:, Nocc:, Nocc:]
+	#VSO_VVVV = np.einsum('ap,bq,cr,ds,abcd->pqrs', TTotal, TTotal, TTotal, TTotal, VMO_VVVV)
+
+	#VMO_OOVV = np.zeros((Norb, Norb, Norb, Norb))
+	#VMO_OOVV[:Nocc, :Nocc, Nocc:, Nocc:] = VMO[:Nocc, :Nocc, Nocc:, Nocc:]
+	#VSO_OOVV = np.einsum('ap,bq,cr,ds,abcd->pqrs', TTotal, TTotal, TTotal, TTotal, VMO_OOVV)
+
 
 	print(np.dot(T.T, T))
 
@@ -198,6 +252,8 @@ if __name__ == '__main__':
 	FIndex = SIndex[:int(len(SIndex)/2)]
 	BIndex = SIndex[int(len(SIndex)/2):]
 	EIndex = list(range(PEnv.shape[0]))
+
+	MP2MLEmbedding(VSO_VVVV, VSO_OOVV, tSO, SIndex, EIndex)
 	
 	#tZero = np.zeros((Norb, Norb, Norb, Norb))
 	#testMFBath = MP2Bath(tZero, FIndex, BIndex, EIndex, PSch, PEnv, hSO, VSO)
