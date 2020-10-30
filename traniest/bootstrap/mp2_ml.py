@@ -27,7 +27,7 @@ def PermuteAABB(V, AIndex, BIndex):
 	VAABB = V[np.ix_(AIndex, AIndex, BIndex, BIndex)]
 	V[np.ix_(BIndex, BIndex, AIndex, AIndex)] = VAABB
 
-def FragmentRHF(hEff, VEff, FIndices):
+def FragmentRHF(hEff, VEff, FIndices, ReturnMO = False):
 	mol = gto.M()
 	nElec = hEff.shape[0] # Half occupied fragment
 	mol.nelectron = nElec
@@ -47,6 +47,8 @@ def FragmentRHF(hEff, VEff, FIndices):
 
 	VMOEff = np.einsum('ijkl,ip,jq,kr,ls->pqrs', VEff, mf.mo_coeff, mf.mo_coeff, mf.mo_coeff, mf.mo_coeff)
 	TFrag = mf.mo_coeff.T[:, FIndices]
+	if ReturnMO:
+		return VMOEff, mf.mo_energy, TFrag, mf.mo_coeff
 	return VMOEff, mf.mo_energy, TFrag
 
 # Takes VEff in the fragment MO basis, and assumes half filling. Returns a four index array where the first two indices
@@ -172,7 +174,7 @@ def GetConditions(VEff, hEff, VMO, tMO, TFragOcc, TFragVir, FIndices):
 	
 	return [CondOOVV, CondOOOO, CondVVVV, CondOOVVMix]
 
-def LossPacked(VEff, hEff, VMO, tMO, TFragOcc, TFragVir, FIndices, Conds, g = None):
+def LossPacked(VEff, hEff, FIndices, Conds, gAndMO = None):
 	#nOcc = tMO.shape[0]
 	#nVir = tMO.shape[2]
 	#VMO_VVVV = VMO[nOcc:, nOcc:, nOcc:, nOcc:]
@@ -186,7 +188,17 @@ def LossPacked(VEff, hEff, VMO, tMO, TFragOcc, TFragVir, FIndices, Conds, g = No
 	#CondOOVVMix = TwoConditionsOOVVMix(VMO_OVOV, tMO, TFragOcc, TFragVir)
 	
 	# These give the unknowns
-	VMOEff, tEff, TFragEff = ERIEffectiveToFragMO(hEff, VEff, FIndices, g = g)
+	FixT = False
+	if gAndMO is None:
+		VMOEff, tEff, TFragEff = ERIEffectiveToFragMO(hEff, VEff, FIndices)
+	else:
+		# The first part is for fixed T and g. Second part is for fixed g only.
+		if FixT:
+			VMOEff = np.einsum('ijkl,ip,jq,kr,ls->pqrs', VEff, gAndMO[1], gAndMO[1], gAndMO[1], gAndMO[1])
+			TFragEff = gAndMO[1].T[:, FIndices]
+			tEff = MaketEff(VMOEff, gAndMO[0])
+		else:
+			VMOEff, tEff, TFragEff = ERIEffectiveToFragMO(hEff, VEff, FIndices, g = gAndMO[0])
 	nOccEff = tEff.shape[0]
 	nVirEff = tEff.shape[2]
 	TFragEffOcc = TFragEff[:nOccEff, :]
@@ -197,16 +209,16 @@ def LossPacked(VEff, hEff, VMO, tMO, TFragOcc, TFragVir, FIndices, Conds, g = No
 	UnknOOOO = TwoConditionsOOOO(VMOEff_OVOV, tEff, TFragEffOcc)
 	UnknVVVV = TwoConditionsVVVV(VMOEff_OVOV, tEff, TFragEffVir)
 	UnknOOVVMix = TwoConditionsOOVVMix(VMOEff_OVOV, tEff, TFragEffOcc, TFragEffVir)
-	
+
 	Loss = [UnknOOVV - Conds[0], UnknOOOO - Conds[1], UnknVVVV - Conds[2], UnknOOVVMix - Conds[3]]
 	return Loss
 	
-def Loss(VEffVec, hEff, VMO, tMO, TFragOcc, TFragVir, FIndices, BIndices, VUnmatched, Conds, g = None):
+def Loss(VEffVec, hEff, FIndices, BIndices, VUnmatched, Conds, gAndMO = None):
 	VEff = VectorToVSymm(VEffVec, FIndices, BIndices)
 	VEff[np.ix_(FIndices, FIndices, FIndices, FIndices)] = VUnmatched[0]
 	VEff[np.ix_(BIndices, BIndices, BIndices, BIndices)] = VUnmatched[1]
 	print(VEff)
-	Losses = LossPacked(VEff, hEff, VMO, tMO, TFragOcc, TFragVir, FIndices, Conds, g = g)
+	Losses = LossPacked(VEff, hEff, FIndices, Conds, gAndMO = gAndMO)
 	LossesVec = MakeLossVector(Losses)
 	print(LossesVec)
 	print(np.inner(LossesVec, LossesVec))
@@ -235,20 +247,22 @@ def MP2MLEmbedding(hEff, VMO, tMO, TFragOcc, TFragVir, FIndices, VEff0 = None, g
 		VFBBBVec = ERIToVector(VFBBB)
 		VEffVec = np.concatenate((VBFFFVec, VFBFBVec, VFFBBVec, VFBBBVec))
 
-	#L = Loss(VEffVec, hEff, VMO, tMO, TFragOcc, TFragVir, FIndices, BIndices, [VFFFF, VBBBB])
-	#print(L)
 	VEff = VectorToVSymm(VEffVec, FIndices, BIndices)
+	VEff[np.ix_(FIndices, FIndices, FIndices, FIndices)] = VFFFF
+	VEff[np.ix_(BIndices, BIndices, BIndices, BIndices)] = VBBBB
 
 	# Get Conditions which are fixed.
 	Conds = GetConditions(VEff, hEff, VMO, tMO, TFragOcc, TFragVir, FIndices)
 
 	# Do RHF to get a fixed g, if desired.
 	if gFixed:
-		VMOEff, g, TFragEff = FragmentRHF(hEff, VEff, FIndices)
+		VMOEff, g, TFragEff, CMOEff = FragmentRHF(hEff, VEff, FIndices, ReturnMO = True)
+		gAndMO = [g, CMOEff]
 	else:
-		g = None
+		gAndMO = None
+		
 
-	VEffFinal = newton(Loss, VEffVec, args = [hEff, VMO, tMO, TFragOcc, TFragVir, FIndices, BIndices, [VFFFF, VBBBB], Conds, g])
+	VEffFinal = newton(Loss, VEffVec, args = [hEff, FIndices, BIndices, [VFFFF, VBBBB], Conds, gAndMO])
 
 def CombinedIndex(Indices, nFB):
 	if len(Indices) == 2:
