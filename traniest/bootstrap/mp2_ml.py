@@ -36,8 +36,14 @@ def FragmentRHF(hEff, VEff, FIndices):
 	mf.get_hcore = lambda *args: hEff
 	mf.get_ovlp = lambda *args: np.eye(nElec)
 	mf._eri = ao2mo.restore(8, VEff, nElec)
+	mf.max_cycle = 1000
 
 	mf.kernel()
+	#try:
+	#	mf.kernel()
+	#except:
+	#	mf.diis = False
+	#	mf.kernel()
 
 	VMOEff = np.einsum('ijkl,ip,jq,kr,ls->pqrs', VEff, mf.mo_coeff, mf.mo_coeff, mf.mo_coeff, mf.mo_coeff)
 	TFrag = mf.mo_coeff.T[:, FIndices]
@@ -53,7 +59,7 @@ def MaketEff(VEff, g):
 		for j in range(nOcc):
 			for a in range(n - nOcc):
 				for b in range(n - nOcc):
-					tEff[i, j, a, b] = VEff[i, j, nOcc + a, nOcc + b] / (g[i] + g[j] - g[nOcc + a] - g[nOcc + b])
+					tEff[i, j, a, b] = (2.0 * VEff[i, nOcc + a, j, nOcc + b] - VEff[i, nOcc + b, j, nOcc + a]) / (g[i] + g[j] - g[nOcc + a] - g[nOcc + b])
 	return tEff
 	
 def ERIToVector(V):
@@ -109,22 +115,22 @@ def MakeLossVector(Losses):
 	return LossesVec
 			
 def TwoConditionsOOVV(VMO_VVVV, tMO, TFragOcc, TFragVir):
-	CondMO = np.einsum('abcd,ijcd->ijab', VMO_VVVV, tMO)
+	CondMO = np.einsum('acbd,ijcd->ijab', VMO_VVVV, tMO)
 	Cond = np.einsum('ijab,ip,jq,ar,bs->prqs', CondMO, TFragOcc, TFragOcc, TFragVir, TFragVir)
 	return Cond
 
-def TwoConditionsOOOO(VMO_OOVV, tMO, TFragOcc):
-	CondMO = np.einsum('klcd,ijcd->ijkl', VMO_OOVV, tMO)
+def TwoConditionsOOOO(VMO_OVOV, tMO, TFragOcc):
+	CondMO = np.einsum('kcld,ijcd->ijkl', VMO_OVOV, tMO)
 	Cond = np.einsum('ijkl,ip,jq,kr,ls->prqs', CondMO, TFragOcc, TFragOcc, TFragOcc, TFragOcc)
 	return Cond
 
-def TwoConditionsVVVV(VMO_OOVV, tMO, TFragVir):
-	CondMO = np.einsum('klcd,klab->abcd', VMO_OOVV, tMO)
+def TwoConditionsVVVV(VMO_OVOV, tMO, TFragVir):
+	CondMO = np.einsum('kcld,klab->abcd', VMO_OVOV, tMO)
 	Cond = np.einsum('abcd,ap,bq,cr,ds->prqs', CondMO, TFragVir, TFragVir, TFragVir, TFragVir)
 	return Cond
 
-def TwoConditionsOOVVMix(VMO_OOVV, tMO, TFragOcc, TFragVir):
-	CondMO = np.einsum('ikac,kjcb->ijab', VMO_OOVV, tMO)
+def TwoConditionsOOVVMix(VMO_OVOV, tMO, TFragOcc, TFragVir):
+	CondMO = np.einsum('iakc,kjcb->ijab', VMO_OVOV, tMO)
 	Cond = np.einsum('ijab,ip,jq,ar,bs->prqs', CondMO, TFragOcc, TFragOcc, TFragVir, TFragVir)
 	return Cond
 
@@ -151,13 +157,14 @@ def LossPacked(VEff, hEff, VMO, tMO, TFragOcc, TFragVir, FIndices):
 	nOcc = tMO.shape[0]
 	nVir = tMO.shape[2]
 	VMO_VVVV = VMO[nOcc:, nOcc:, nOcc:, nOcc:]
-	VMO_OOVV = VMO[:nOcc, :nOcc, nOcc:, nOcc:]
+	#VMO_OOVV = VMO[:nOcc, :nOcc, nOcc:, nOcc:]
+	VMO_OVOV = VMO[:nOcc, nOcc:, :nOcc, nOcc:]
 	
 	# These give the FF block of the conditions
 	CondOOVV = TwoConditionsOOVV(VMO_VVVV, tMO, TFragOcc, TFragVir)
-	CondOOOO = TwoConditionsOOOO(VMO_OOVV, tMO, TFragOcc)
-	CondVVVV = TwoConditionsVVVV(VMO_OOVV, tMO, TFragVir)
-	CondOOVVMix = TwoConditionsOOVVMix(VMO_OOVV, tMO, TFragOcc, TFragVir)
+	CondOOOO = TwoConditionsOOOO(VMO_OVOV, tMO, TFragOcc)
+	CondVVVV = TwoConditionsVVVV(VMO_OVOV, tMO, TFragVir)
+	CondOOVVMix = TwoConditionsOOVVMix(VMO_OVOV, tMO, TFragOcc, TFragVir)
 	
 	# These give the unknowns
 	VMOEff, tEff, TFragEff = ERIEffectiveToFragMO(hEff, VEff, FIndices)
@@ -166,11 +173,11 @@ def LossPacked(VEff, hEff, VMO, tMO, TFragOcc, TFragVir, FIndices):
 	TFragEffOcc = TFragEff[:nOccEff, :]
 	TFragEffVir = TFragEff[nOccEff:, :]
 	VMOEff_VVVV = VMOEff[nOccEff:, nOccEff:, nOccEff:, nOccEff:]
-	VMOEff_OOVV = VMOEff[:nOccEff, :nOccEff, nOccEff:, nOccEff:]
+	VMOEff_OVOV = VMOEff[:nOccEff, nOccEff:, :nOccEff, nOccEff:]
 	UnknOOVV = TwoConditionsOOVV(VMOEff_VVVV, tEff, TFragEffOcc, TFragEffVir)
-	UnknOOOO = TwoConditionsOOOO(VMOEff_OOVV, tEff, TFragEffOcc)
-	UnknVVVV = TwoConditionsVVVV(VMOEff_OOVV, tEff, TFragEffVir)
-	UnknOOVVMix = TwoConditionsOOVVMix(VMOEff_OOVV, tEff, TFragEffOcc, TFragEffVir)
+	UnknOOOO = TwoConditionsOOOO(VMOEff_OVOV, tEff, TFragEffOcc)
+	UnknVVVV = TwoConditionsVVVV(VMOEff_OVOV, tEff, TFragEffVir)
+	UnknOOVVMix = TwoConditionsOOVVMix(VMOEff_OVOV, tEff, TFragEffOcc, TFragEffVir)
 	
 	Loss = [UnknOOVV - CondOOVV, UnknOOOO - CondOOOO, UnknVVVV - CondVVVV, UnknOOVVMix - CondOOVVMix]
 	return Loss
@@ -179,8 +186,11 @@ def Loss(VEffVec, hEff, VMO, tMO, TFragOcc, TFragVir, FIndices, BIndices, VUnmat
 	VEff = VectorToVSymm(VEffVec, FIndices, BIndices)
 	VEff[np.ix_(FIndices, FIndices, FIndices, FIndices)] = VUnmatched[0]
 	VEff[np.ix_(BIndices, BIndices, BIndices, BIndices)] = VUnmatched[1]
+	print(VEff)
 	Losses = LossPacked(VEff, hEff, VMO, tMO, TFragOcc, TFragVir, FIndices)
 	LossesVec = MakeLossVector(Losses)
+	print(LossesVec)
+	print(np.inner(LossesVec, LossesVec))
 	return LossesVec
 
 
@@ -207,6 +217,7 @@ def MP2MLEmbedding(hEff, VMO, tMO, TFragOcc, TFragVir, FIndices, VEff0 = None):
 		VEffVec = np.concatenate((VBFFFVec, VFBFBVec, VFFBBVec, VFBBBVec))
 
 	#L = Loss(VEffVec, hEff, VMO, tMO, TFragOcc, TFragVir, FIndices, BIndices, [VFFFF, VBBBB])
+	#print(L)
 	VEffFinal = newton(Loss, VEffVec, args = [hEff, VMO, tMO, TFragOcc, TFragVir, FIndices, BIndices, [VFFFF, VBBBB]])
 
 def CombinedIndex(Indices, nFB):
@@ -276,10 +287,10 @@ if __name__ == '__main__':
 
 	TTotal = np.dot(StoOrth, T)
 	TMOtoAO = np.linalg.inv(mo_coeff)
-	TMOtoLO = np.dot(TMOtoAO, TTotal)
-	TFragMOtoLO = TMOtoLO[:, FIndices]
-	TFragOccMOtoLO = TFragMOtoLO[:nocc, :]
-	TFragVirMOtoLO = TFragMOtoLO[nocc:, :]
+	TMOtoSO = np.dot(TMOtoAO, TTotal)
+	TFragMOtoSO = TMOtoSO[:, FIndices]
+	TFragOccMOtoSO = TFragMOtoSO[:nocc, :]
+	TFragVirMOtoSO = TFragMOtoSO[nocc:, :]
 
 	hSO = reduce(np.dot, (TTotal.T, mf.get_hcore(), TTotal))
 	VSO = ao2mo.kernel(mol, TTotal)
@@ -324,7 +335,7 @@ if __name__ == '__main__':
 	#tMO_Occ = np.zeros((Norb, Norb, Norb, Norb))
 	#tMO_Vir = np.zeros((Norb, Norb, Norb, Norb))
 
-	MP2MLEmbedding(hFrag, VMO, t2, TFragOccMOtoLO, TFragVirMOtoLO, FIndices, VEff0 = VFrag)
+	MP2MLEmbedding(hFrag, VMO, t2, TFragOccMOtoSO, TFragVirMOtoSO, FIndices, VEff0 = VFrag)
 	
 	#tZero = np.zeros((Norb, Norb, Norb, Norb))
 	#testMFBath = MP2Bath(tZero, FIndex, BIndex, EIndex, PSch, PEnv, hSO, VSO)
