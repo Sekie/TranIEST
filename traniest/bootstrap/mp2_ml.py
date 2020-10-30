@@ -144,8 +144,11 @@ def OneConditionsVV(VSO_OOVV, tSO, SIndices):
 	CondS = Cond[SIndices, :][:, SIndices]
 	return CondS
 
-def ERIEffectiveToFragMO(hEff, VEff, FIndices):
-	VMOEff, g, TFrag = FragmentRHF(hEff, VEff, FIndices)
+def ERIEffectiveToFragMO(hEff, VEff, FIndices, g = None):
+	if g is None:
+		VMOEff, g, TFrag = FragmentRHF(hEff, VEff, FIndices)
+	else:
+		VMOEff, gTMP, TFrag = FragmentRHF(hEff, VEff, FIndices)
 	tEff = MaketEff(VMOEff, g)
 	#nOcc = tEff.shape[0]
 	#nVir = tEff.shape[2]
@@ -153,7 +156,8 @@ def ERIEffectiveToFragMO(hEff, VEff, FIndices):
 	#Unkn = TwoConditionsOOVV(VMOEff_VVVV, tEff, TFrag)
 	return VMOEff, tEff, TFrag
 
-def LossPacked(VEff, hEff, VMO, tMO, TFragOcc, TFragVir, FIndices):
+# Contains variables required for Loss calculation that only need to be calculated once
+def GetConditions(VEff, hEff, VMO, tMO, TFragOcc, TFragVir, FIndices):
 	nOcc = tMO.shape[0]
 	nVir = tMO.shape[2]
 	VMO_VVVV = VMO[nOcc:, nOcc:, nOcc:, nOcc:]
@@ -166,8 +170,23 @@ def LossPacked(VEff, hEff, VMO, tMO, TFragOcc, TFragVir, FIndices):
 	CondVVVV = TwoConditionsVVVV(VMO_OVOV, tMO, TFragVir)
 	CondOOVVMix = TwoConditionsOOVVMix(VMO_OVOV, tMO, TFragOcc, TFragVir)
 	
+	return [CondOOVV, CondOOOO, CondVVVV, CondOOVVMix]
+
+def LossPacked(VEff, hEff, VMO, tMO, TFragOcc, TFragVir, FIndices, Conds, g = None):
+	#nOcc = tMO.shape[0]
+	#nVir = tMO.shape[2]
+	#VMO_VVVV = VMO[nOcc:, nOcc:, nOcc:, nOcc:]
+	##VMO_OOVV = VMO[:nOcc, :nOcc, nOcc:, nOcc:]
+	#VMO_OVOV = VMO[:nOcc, nOcc:, :nOcc, nOcc:]
+	
+	## These give the FF block of the conditions
+	#CondOOVV = TwoConditionsOOVV(VMO_VVVV, tMO, TFragOcc, TFragVir)
+	#CondOOOO = TwoConditionsOOOO(VMO_OVOV, tMO, TFragOcc)
+	#CondVVVV = TwoConditionsVVVV(VMO_OVOV, tMO, TFragVir)
+	#CondOOVVMix = TwoConditionsOOVVMix(VMO_OVOV, tMO, TFragOcc, TFragVir)
+	
 	# These give the unknowns
-	VMOEff, tEff, TFragEff = ERIEffectiveToFragMO(hEff, VEff, FIndices)
+	VMOEff, tEff, TFragEff = ERIEffectiveToFragMO(hEff, VEff, FIndices, g = g)
 	nOccEff = tEff.shape[0]
 	nVirEff = tEff.shape[2]
 	TFragEffOcc = TFragEff[:nOccEff, :]
@@ -179,22 +198,22 @@ def LossPacked(VEff, hEff, VMO, tMO, TFragOcc, TFragVir, FIndices):
 	UnknVVVV = TwoConditionsVVVV(VMOEff_OVOV, tEff, TFragEffVir)
 	UnknOOVVMix = TwoConditionsOOVVMix(VMOEff_OVOV, tEff, TFragEffOcc, TFragEffVir)
 	
-	Loss = [UnknOOVV - CondOOVV, UnknOOOO - CondOOOO, UnknVVVV - CondVVVV, UnknOOVVMix - CondOOVVMix]
+	Loss = [UnknOOVV - Conds[0], UnknOOOO - Conds[1], UnknVVVV - Conds[2], UnknOOVVMix - Conds[3]]
 	return Loss
 	
-def Loss(VEffVec, hEff, VMO, tMO, TFragOcc, TFragVir, FIndices, BIndices, VUnmatched):
+def Loss(VEffVec, hEff, VMO, tMO, TFragOcc, TFragVir, FIndices, BIndices, VUnmatched, Conds, g = None):
 	VEff = VectorToVSymm(VEffVec, FIndices, BIndices)
 	VEff[np.ix_(FIndices, FIndices, FIndices, FIndices)] = VUnmatched[0]
 	VEff[np.ix_(BIndices, BIndices, BIndices, BIndices)] = VUnmatched[1]
 	print(VEff)
-	Losses = LossPacked(VEff, hEff, VMO, tMO, TFragOcc, TFragVir, FIndices)
+	Losses = LossPacked(VEff, hEff, VMO, tMO, TFragOcc, TFragVir, FIndices, Conds, g = g)
 	LossesVec = MakeLossVector(Losses)
 	print(LossesVec)
 	print(np.inner(LossesVec, LossesVec))
 	return LossesVec
 
 
-def MP2MLEmbedding(hEff, VMO, tMO, TFragOcc, TFragVir, FIndices, VEff0 = None):
+def MP2MLEmbedding(hEff, VMO, tMO, TFragOcc, TFragVir, FIndices, VEff0 = None, gFixed = False):
 	N = 2 * int(len(FIndices))
 	nFrag = len(FIndices)
 	BIndices = [i + nFrag for i in FIndices]
@@ -218,7 +237,18 @@ def MP2MLEmbedding(hEff, VMO, tMO, TFragOcc, TFragVir, FIndices, VEff0 = None):
 
 	#L = Loss(VEffVec, hEff, VMO, tMO, TFragOcc, TFragVir, FIndices, BIndices, [VFFFF, VBBBB])
 	#print(L)
-	VEffFinal = newton(Loss, VEffVec, args = [hEff, VMO, tMO, TFragOcc, TFragVir, FIndices, BIndices, [VFFFF, VBBBB]])
+	VEff = VectorToVSymm(VEffVec, FIndices, BIndices)
+
+	# Get Conditions which are fixed.
+	Conds = GetConditions(VEff, hEff, VMO, tMO, TFragOcc, TFragVir, FIndices)
+
+	# Do RHF to get a fixed g, if desired.
+	if gFixed:
+		VMOEff, g, TFragEff = FragmentRHF(hEff, VEff, FIndices)
+	else:
+		g = None
+
+	VEffFinal = newton(Loss, VEffVec, args = [hEff, VMO, tMO, TFragOcc, TFragVir, FIndices, BIndices, [VFFFF, VBBBB], Conds, g])
 
 def CombinedIndex(Indices, nFB):
 	if len(Indices) == 2:
@@ -335,7 +365,7 @@ if __name__ == '__main__':
 	#tMO_Occ = np.zeros((Norb, Norb, Norb, Norb))
 	#tMO_Vir = np.zeros((Norb, Norb, Norb, Norb))
 
-	MP2MLEmbedding(hFrag, VMO, t2, TFragOccMOtoSO, TFragVirMOtoSO, FIndices, VEff0 = VFrag)
+	MP2MLEmbedding(hFrag, VMO, t2, TFragOccMOtoSO, TFragVirMOtoSO, FIndices, VEff0 = VFrag, gFixed = True)
 	
 	#tZero = np.zeros((Norb, Norb, Norb, Norb))
 	#testMFBath = MP2Bath(tZero, FIndex, BIndex, EIndex, PSch, PEnv, hSO, VSO)
