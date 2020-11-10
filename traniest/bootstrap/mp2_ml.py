@@ -38,12 +38,19 @@ def FragmentRHF(hEff, VEff, FIndices, ReturnMO = False):
 	mf._eri = ao2mo.restore(8, VEff, nElec)
 	mf.max_cycle = 1000
 
+	#from frankenstein.sgscf.sgopt import doRCA
 	mf.kernel()
 	#try:
 	#	mf.kernel()
 	#except:
 	#	mf.diis = False
 	#	mf.kernel()
+	#try:
+	#	assert(mf.converged)
+	#except:
+	#	print("DIIS did not converge, trying RCA")
+	#	e, P = doRCA(mf, rca_space = 2)
+	#	mf.kernel(P)
 
 	VMOEff = np.einsum('ijkl,ip,jq,kr,ls->pqrs', VEff, mf.mo_coeff, mf.mo_coeff, mf.mo_coeff, mf.mo_coeff)
 	TFrag = mf.mo_coeff.T[:, FIndices]
@@ -188,7 +195,7 @@ def LossPacked(VEff, hEff, FIndices, Conds, gAndMO = None):
 	#CondOOVVMix = TwoConditionsOOVVMix(VMO_OVOV, tMO, TFragOcc, TFragVir)
 	
 	# These give the unknowns
-	FixT = False
+	FixT = True
 	if gAndMO is None:
 		VMOEff, tEff, TFragEff = ERIEffectiveToFragMO(hEff, VEff, FIndices)
 	else:
@@ -210,6 +217,8 @@ def LossPacked(VEff, hEff, FIndices, Conds, gAndMO = None):
 	UnknVVVV = TwoConditionsVVVV(VMOEff_OVOV, tEff, TFragEffVir)
 	UnknOOVVMix = TwoConditionsOOVVMix(VMOEff_OVOV, tEff, TFragEffOcc, TFragEffVir)
 
+	#print(Conds)
+	#print(UnknOOVV, UnknOOOO, UnknVVVV, UnknOOVVMix)
 	Loss = [UnknOOVV - Conds[0], UnknOOOO - Conds[1], UnknVVVV - Conds[2], UnknOOVVMix - Conds[3]]
 	return Loss
 	
@@ -217,13 +226,41 @@ def Loss(VEffVec, hEff, FIndices, BIndices, VUnmatched, Conds, gAndMO = None):
 	VEff = VectorToVSymm(VEffVec, FIndices, BIndices)
 	VEff[np.ix_(FIndices, FIndices, FIndices, FIndices)] = VUnmatched[0]
 	VEff[np.ix_(BIndices, BIndices, BIndices, BIndices)] = VUnmatched[1]
-	print(VEff)
+	#print(VEff)
 	Losses = LossPacked(VEff, hEff, FIndices, Conds, gAndMO = gAndMO)
 	LossesVec = MakeLossVector(Losses)
-	print(LossesVec)
-	print(np.inner(LossesVec, LossesVec))
+	#print(LossesVec)
+	#print(np.inner(LossesVec, LossesVec))
 	return LossesVec
 
+def dLoss(VEffVec, hEff, FIndices, BIndices, VUnmatched, Conds, gAndMO):
+	dV = 0.01
+	Loss0 = Loss(VEffVec, hEff, FIndices, BIndices, VUnmatched, Conds, gAndMO)
+	J = np.zeros((VEffVec.shape[0], VEffVec.shape[0]))
+	for i in range(VEffVec.shape[0]):
+		VEffVecPlusdV = VEffVec.copy()
+		VEffVecMinsdV = VEffVec.copy()
+		VEffVecPlusdV[i] += dV
+		VEffVecMinsdV[i] -= dV
+		LossPlusdV = Loss(VEffVecPlusdV, hEff, FIndices, BIndices, VUnmatched, Conds, gAndMO)
+		LossMinsdV = Loss(VEffVecMinsdV, hEff, FIndices, BIndices, VUnmatched, Conds, gAndMO)
+		dLoss = (LossPlusdV - LossMinsdV) / (dV + dV)
+		J[i] = dLoss
+	J = J.T
+	return J
+
+def NewtonRaphson(f, x0, df, args, tol = 1e-6):
+	F = f(x0, *args)
+	J = df(x0, *args)
+	x = x0.copy()
+	while not all([abs(x) < tol for x in F]):
+		J = df(x, *args)
+		print("L =", F)
+		print("J\n", J)
+		x = x - np.linalg.inv(J) @ F
+		print(F)
+		F = f(x, *args)
+	return x
 
 def MP2MLEmbedding(hEff, VMO, tMO, TFragOcc, TFragVir, FIndices, VEff0 = None, gFixed = False):
 	N = 2 * int(len(FIndices))
@@ -260,9 +297,9 @@ def MP2MLEmbedding(hEff, VMO, tMO, TFragOcc, TFragVir, FIndices, VEff0 = None, g
 		gAndMO = [g, CMOEff]
 	else:
 		gAndMO = None
-		
 
-	VEffFinal = newton(Loss, VEffVec, args = [hEff, FIndices, BIndices, [VFFFF, VBBBB], Conds, gAndMO])
+	VEffFinal = NewtonRaphson(Loss, VEffVec, dLoss, [hEff, FIndices, BIndices, [VFFFF, VBBBB], Conds, gAndMO])
+	#VEffFinal = newton(Loss, VEffVec, args = [hEff, FIndices, BIndices, [VFFFF, VBBBB], Conds, gAndMO], fprime = dLoss, maxiter = 50)
 
 def CombinedIndex(Indices, nFB):
 	if len(Indices) == 2:
@@ -276,7 +313,7 @@ if __name__ == '__main__':
 	from functools import reduce
 	from pyscf import gto, scf, mp, lo, ao2mo
 	from frankenstein.tools.tensor_utils import get_symm_mat_pow
-	N = 4
+	N = 6
 	nocc = int(N / 2)
 	r = 1.0
 	mol = gto.Mole()
@@ -378,6 +415,8 @@ if __name__ == '__main__':
 
 	#tMO_Occ = np.zeros((Norb, Norb, Norb, Norb))
 	#tMO_Vir = np.zeros((Norb, Norb, Norb, Norb))
+
+	print(TFragOccMOtoSO)
 
 	MP2MLEmbedding(hFrag, VMO, t2, TFragOccMOtoSO, TFragVirMOtoSO, FIndices, VEff0 = VFrag, gFixed = True)
 	
