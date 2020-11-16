@@ -108,6 +108,36 @@ def VectorToVSymm(VVec, FIndices, BIndices):
 	PermuteABBB(V, FIndices, BIndices)
 	return V
 
+def dbgA(T, g, nOcc, nVir, SIndices):
+	nFB = len(SIndices)
+	TOcc = T[:nOcc, :]
+	TVir = T[nOcc:, :]
+	gTensor = np.zeros((nOcc, nOcc, nVir, nVir))
+	for i in range(nOcc):
+		for j in range(nOcc):
+			for a in range(nVir):
+				for b in range(nVir):
+					gTensor[i, j, a, b] = 1.0 / (g[i] + g[j] - g[nOcc + a] - g[nOcc + b])
+	A = np.zeros((nOcc, nOcc, nVir, nVir, nFB, nFB, nFB, nFB, nFB, nFB, nFB, nFB))
+	for i in range(nOcc):
+		for j in range(nOcc):
+			for a in range(nVir):
+				for b in range(nVir):
+					for p in range(nFB):
+						for q in range(nFB):
+							for r in range(nFB):
+								for s in range(nFB):
+									for t in range(nFB):
+										for u in range(nFB):
+											for v in range(nFB):
+												for w in range(nFB):
+													tmp1 = np.einsum('cp,dq,cv,dw,ijcd->ijpqvw', TVir, TVir, TVir, TVir, gTensor)
+													tmp2 = np.einsum('cp,dq,dv,cw,ijcd->ijpqvw', TVir, TVir, TVir, TVir, gTensor)
+													A[i, j, a, b, p, q, r, s, t, u, v, w] = 2.0 * tmp1[i, j, p, q, v, w] * TVir[a, r] * TVir[b, s] * TOcc[i, t] * TOcc[j, u] - tmp2[i, j, p, q, v, w] * TVir[a, r] * TVir[b, s] * TOcc[i, t] * TOcc[j, u]
+	print(A)
+	input()
+	return
+
 def MakeLossVector(Losses):
 	LossesVec = np.zeros(0)
 	for Loss in Losses:
@@ -210,6 +240,7 @@ def LossPacked(VEff, hEff, FIndices, Conds, gAndMO = None):
 	nVirEff = tEff.shape[2]
 	TFragEffOcc = TFragEff[:nOccEff, :]
 	TFragEffVir = TFragEff[nOccEff:, :]
+	dbgA(gAndMO[1].T, gAndMO[0], nOccEff, nVirEff, [0, 1])
 	VMOEff_VVVV = VMOEff[nOccEff:, nOccEff:, nOccEff:, nOccEff:]
 	VMOEff_OVOV = VMOEff[:nOccEff, nOccEff:, :nOccEff, nOccEff:]
 	UnknOOVV = TwoConditionsOOVV(VMOEff_VVVV, tEff, TFragEffOcc, TFragEffVir)
@@ -234,7 +265,7 @@ def Loss(VEffVec, hEff, FIndices, BIndices, VUnmatched, Conds, gAndMO = None):
 	return LossesVec
 
 def dLoss(VEffVec, hEff, FIndices, BIndices, VUnmatched, Conds, gAndMO):
-	dV = 0.01
+	dV = 0.0001
 	Loss0 = Loss(VEffVec, hEff, FIndices, BIndices, VUnmatched, Conds, gAndMO)
 	J = np.zeros((VEffVec.shape[0], VEffVec.shape[0]))
 	for i in range(VEffVec.shape[0]):
@@ -245,21 +276,56 @@ def dLoss(VEffVec, hEff, FIndices, BIndices, VUnmatched, Conds, gAndMO):
 		LossPlusdV = Loss(VEffVecPlusdV, hEff, FIndices, BIndices, VUnmatched, Conds, gAndMO)
 		LossMinsdV = Loss(VEffVecMinsdV, hEff, FIndices, BIndices, VUnmatched, Conds, gAndMO)
 		dLoss = (LossPlusdV - LossMinsdV) / (dV + dV)
+		#print(i)
+		#print(LossPlusdV)
+		#print(LossMinsdV)
 		J[i] = dLoss
 	J = J.T
 	return J
 
-def NewtonRaphson(f, x0, df, args, tol = 1e-6):
+def BacktrackLineSearch(f, x, dx, args, beta = 0.5, y0 = None):
+	alph = 1.0
+	xTest = x + alph * dx
+	if y0 is None:
+		yInit = np.linalg.norm(f(x, *args))
+	else:
+		yInit = np.linalg.norm(y0)
+	y = f(xTest, *args)
+	yTest = np.linalg.norm(y)
+	while(yTest > yInit):
+		alph = beta * alph
+		xTest = x + alph * dx
+		y = f(xTest, *args)
+		yTest = np.linalg.norm(y)
+		if alph < 1e-20:
+			print("Backtrack line search has failed")
+			break
+	print("Linesearch finds alph =", alph)
+	return xTest, y
+	
+
+def NewtonRaphson(f, x0, df, args, tol = 1e-6, alp = 1e0, eps = 1e-6):
 	F = f(x0, *args)
-	J = df(x0, *args)
 	x = x0.copy()
 	while not all([abs(x) < tol for x in F]):
 		J = df(x, *args)
 		print("L =", F)
 		print("J\n", J)
-		x = x - np.linalg.inv(J) @ F
-		print(F)
-		F = f(x, *args)
+		try:
+			JInv = np.linalg.inv(J)
+		except:
+			e, V = np.linalg.eig(J)
+			JMod = np.zeros(J.shape)
+			np.fill_diagonal(JMod, e + eps)
+			JMod = V @ JMod @ V.T
+			JInv = np.linalg.inv(JMod)
+		dx = -1.0 * JInv @ F
+		print("dx =", dx)
+		x, F = BacktrackLineSearch(f, x, dx, args, y0 = F) #x - alp * JInv @ F
+		#F = f(x, *args)
+		print("x =", x)
+		print("L =", F)
+		input()
 	return x
 
 def MP2MLEmbedding(hEff, VMO, tMO, TFragOcc, TFragVir, FIndices, VEff0 = None, gFixed = False):
@@ -283,6 +349,7 @@ def MP2MLEmbedding(hEff, VMO, tMO, TFragOcc, TFragVir, FIndices, VEff0 = None, g
 		VFFBBVec = ERIToVector(VFFBB)
 		VFBBBVec = ERIToVector(VFBBB)
 		VEffVec = np.concatenate((VBFFFVec, VFBFBVec, VFFBBVec, VFBBBVec))
+	print("VEff0\n", VEff0)
 
 	VEff = VectorToVSymm(VEffVec, FIndices, BIndices)
 	VEff[np.ix_(FIndices, FIndices, FIndices, FIndices)] = VFFFF
@@ -298,6 +365,28 @@ def MP2MLEmbedding(hEff, VMO, tMO, TFragOcc, TFragVir, FIndices, VEff0 = None, g
 	else:
 		gAndMO = None
 
+	#VEffVec = np.random.rand(VEffVec.shape[0],)
+	#scan_start = -2.
+	#scan_end = 2.
+	#step_size = 0.25
+	#steps = int((scan_end - scan_start)/step_size) + 1
+	#f = open('scan.txt', 'w')
+	#for i in range(steps):
+	#	L0 = Loss(np.asarray([0, 0, 0, scan_start + i * step_size]), hEff, FIndices, BIndices, [VFFFF, VBBBB], Conds, gAndMO)
+	#	f.write("%f\t%f\t%f\t%f\t%f\n" % (scan_start + i * step_size, L0[0], L0[1], L0[2], L0[3]))
+	#	for j in range(steps):
+	#		for k in range(steps):
+	#			for l in range(steps):
+	#				L0 = Loss(np.asarray([scan_start + i * step_size, scan_start + j * step_size, scan_start + k * step_size, scan_start + l * step_size]), hEff, FIndices, BIndices, [VFFFF, VBBBB], Conds, gAndMO)
+	#				f.write("%f\t%f\t%f\t%f\t%f\t%f\t%f\t%f\n" % (scan_start + i * step_size, scan_start + j * step_size, scan_start + k * step_size, scan_start + l * step_size, L0[0], L0[1], L0[2], L0[3]))
+	L1 = Loss(np.asarray([1., 0., 0., 0.]), hEff, FIndices, BIndices, [VFFFF, VBBBB], Conds, gAndMO)
+	L2 = Loss(np.asarray([0., 1., 0., 0.]), hEff, FIndices, BIndices, [VFFFF, VBBBB], Conds, gAndMO)
+	L3 = Loss(np.asarray([0., 0., 1., 0.]), hEff, FIndices, BIndices, [VFFFF, VBBBB], Conds, gAndMO)
+	L4 = Loss(np.asarray([0., 0., 0., 1.]), hEff, FIndices, BIndices, [VFFFF, VBBBB], Conds, gAndMO)
+	print(L1)
+	print(L2)
+	print(L3)
+	print(L4)
 	VEffFinal = NewtonRaphson(Loss, VEffVec, dLoss, [hEff, FIndices, BIndices, [VFFFF, VBBBB], Conds, gAndMO])
 	#VEffFinal = newton(Loss, VEffVec, args = [hEff, FIndices, BIndices, [VFFFF, VBBBB], Conds, gAndMO], fprime = dLoss, maxiter = 50)
 
