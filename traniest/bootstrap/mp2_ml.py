@@ -173,6 +173,22 @@ def TwoConditionsOOVVMix(VMO_OVOV, tMO, TFragOcc, TFragVir):
 	Cond = np.einsum('ijab,ip,jq,ar,bs->prqs', CondMO, TFragOcc, TFragOcc, TFragVir, TFragVir)
 	return Cond
 
+def TwoConditionsVVVV1e(VMO_VVVV, tMO, TFragOcc, TFragVir):
+	CondMO = np.einsum('abcd,ijcd->ijab', VMO_VVVV, tMO)
+	Cond = np.einsum('ijab,ip,jq,ar,bs->prqs', CondMO, TFragOcc, TFragOcc, TFragVir, TFragVir)
+	return Cond
+
+def TwoConditionsOOOO2e(VMO_OOOO, tMO, TFragOcc, TFragVir):
+	CondMO = np.einsum('ikjl,klab->ijab', VMO_OOOO, tMO)
+	Cond = np.einsum('ijab,ip,jq,ar,bs->prqs', CondMO, TFragOcc, TFragOcc, TFragVir, TFragVir)
+	return Cond
+
+def TwoConditionsOOOO1e(VMO_OOOO, tMO, TFragOcc, TFragVir):
+	CondMO = np.einsum('ijkl,klab->ijab', VMO_OOOO, tMO)
+	Cond = np.einsum('ijab,ip,jq,ar,bs->prqs', CondMO, TFragOcc, TFragOcc, TFragVir, TFragVir)
+	return Cond
+
+
 def OneConditionsOO(VSO_OOVV, tSO, SIndices):
 	Cond = np.einsum('ikcd,jkcd->ij', VSO_OOVV, tSO)
 	CondS = Cond[SIndices, :][:, SIndices]
@@ -200,16 +216,19 @@ def GetConditions(VEff, hEff, VMO, tMO, TFragOcc, TFragVir, FIndices):
 	nOcc = tMO.shape[0]
 	nVir = tMO.shape[2]
 	VMO_VVVV = VMO[nOcc:, nOcc:, nOcc:, nOcc:]
-	#VMO_OOVV = VMO[:nOcc, :nOcc, nOcc:, nOcc:]
 	VMO_OVOV = VMO[:nOcc, nOcc:, :nOcc, nOcc:]
+	VMO_OOOO = VMO[:nOcc, :nOcc, :nOcc, :nOcc]
 	
 	# These give the FF block of the conditions
 	CondOOVV = TwoConditionsOOVV(VMO_VVVV, tMO, TFragOcc, TFragVir)
 	CondOOOO = TwoConditionsOOOO(VMO_OVOV, tMO, TFragOcc)
 	CondVVVV = TwoConditionsVVVV(VMO_OVOV, tMO, TFragVir)
 	CondOOVVMix = TwoConditionsOOVVMix(VMO_OVOV, tMO, TFragOcc, TFragVir)
-	
-	return [CondOOVV, CondOOOO, CondVVVV, CondOOVVMix]
+	CondVVVV1e = TwoConditionsVVVV1e(VMO_VVVV, tMO, TFragOcc, TFragVir)
+	CondOOOO2e = TwoConditionsOOOO2e(VMO_OOOO, tMO, TFragOcc, TFragVir)
+	CondOOOO1e = TwoConditionsOOOO1e(VMO_OOOO, tMO, TFragOcc, TFragVir)
+
+	return [CondOOVV, CondOOOO, CondVVVV, CondOOVVMix, CondVVVV1e, CondOOOO2e, CondOOOO1e]
 
 def LossPacked(VEff, hEff, FIndices, Conds, gAndMO = None):
 	#nOcc = tMO.shape[0]
@@ -243,14 +262,19 @@ def LossPacked(VEff, hEff, FIndices, Conds, gAndMO = None):
 	#dbgA(gAndMO[1].T, gAndMO[0], nOccEff, nVirEff, [0, 1])
 	VMOEff_VVVV = VMOEff[nOccEff:, nOccEff:, nOccEff:, nOccEff:]
 	VMOEff_OVOV = VMOEff[:nOccEff, nOccEff:, :nOccEff, nOccEff:]
+	VMOEff_OOOO = VMOEff[:nOccEff, :nOccEff, :nOccEff, :nOccEff]
 	UnknOOVV = TwoConditionsOOVV(VMOEff_VVVV, tEff, TFragEffOcc, TFragEffVir)
 	UnknOOOO = TwoConditionsOOOO(VMOEff_OVOV, tEff, TFragEffOcc)
 	UnknVVVV = TwoConditionsVVVV(VMOEff_OVOV, tEff, TFragEffVir)
 	UnknOOVVMix = TwoConditionsOOVVMix(VMOEff_OVOV, tEff, TFragEffOcc, TFragEffVir)
+	UnknVVVV1e = TwoConditionsVVVV1e(VMOEff_VVVV, tEff, TFragEffOcc, TFragEffVir)
+	UnknOOOO2e = TwoConditionsOOOO2e(VMOEff_OOOO, tEff, TFragEffOcc, TFragEffVir)
+	UnknOOOO1e = TwoConditionsOOOO1e(VMOEff_OOOO, tEff, TFragEffOcc, TFragEffVir)
+
 
 	#print(Conds)
 	#print(UnknOOVV, UnknOOOO, UnknVVVV, UnknOOVVMix)
-	Loss = [UnknOOVV - Conds[0], UnknOOOO - Conds[1], UnknVVVV - Conds[2], UnknOOVVMix - Conds[3]]
+	Loss = [UnknOOVV - Conds[0], UnknOOOO - Conds[1], UnknVVVV - Conds[2], UnknOOVVMix - Conds[3], UnknVVVV1e - Conds[4], UnknOOOO2e - Conds[5], UnknOOOO1e - Conds[6]]
 	return Loss
 	
 def Loss(VEffVec, hEff, FIndices, BIndices, VUnmatched, Conds, gAndMO = None):
@@ -372,8 +396,8 @@ def MP2MLEmbedding(hEff, VMO, tMO, TFragOcc, TFragVir, FIndices, VEff0 = None, g
 	steps = int((scan_end - scan_start)/step_size) + 1
 	f = open('scan.txt', 'w')
 	for i in range(steps):
-		L0 = Loss(np.asarray([0, scan_start + i * step_size, 0, 0]), hEff, FIndices, BIndices, [VFFFF, VBBBB], Conds, gAndMO)
-		f.write("%f\t%f\t%f\t%f\t%f\n" % (scan_start + i * step_size, L0[0], L0[1], L0[2], L0[3]))
+		L0 = Loss(np.asarray([scan_start + i * step_size, 0, 0, 0]), hEff, FIndices, BIndices, [VFFFF, VBBBB], Conds, gAndMO)
+		f.write("%f\t%f\t%f\t%f\n" % (scan_start + i * step_size, L0[4], L0[5], L0[6]))
 	#	for j in range(steps):
 	#		for k in range(steps):
 	#			for l in range(steps):
