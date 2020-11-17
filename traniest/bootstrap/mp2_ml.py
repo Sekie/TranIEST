@@ -51,12 +51,21 @@ def FragmentRHF(hEff, VEff, FIndices, ReturnMO = False):
 	#	print("DIIS did not converge, trying RCA")
 	#	e, P = doRCA(mf, rca_space = 2)
 	#	mf.kernel(P)
+	P = mf.make_rdm1()
+	print(P[1, 1] * P[0, 0] - P[1, 0]**2.)
+	G = np.zeros((P.shape[0], P.shape[0], P.shape[0], P.shape[0]))
+	for i in range(P.shape[0]):
+		for j in range(P.shape[0]):
+			for k in range(P.shape[0]):
+				for l in range(P.shape[0]):
+					G[i, j, k, l] = P[i, j] * P[k, l] - P[i, l] * P[k, j]
+	print(G)
 
 	VMOEff = np.einsum('ijkl,ip,jq,kr,ls->pqrs', VEff, mf.mo_coeff, mf.mo_coeff, mf.mo_coeff, mf.mo_coeff)
 	TFrag = mf.mo_coeff.T[:, FIndices]
 	if ReturnMO:
-		return VMOEff, mf.mo_energy, TFrag, mf.mo_coeff
-	return VMOEff, mf.mo_energy, TFrag
+		return VMOEff, mf.mo_energy, TFrag, mf.mo_coeff, G
+	return VMOEff, mf.mo_energy, TFrag, G
 
 # Takes VEff in the fragment MO basis, and assumes half filling. Returns a four index array where the first two indices
 # are the occupied orbitals and the last two indices are the virtual orbitals
@@ -185,15 +194,15 @@ def OneConditionsVV(VSO_OOVV, tSO, SIndices):
 
 def ERIEffectiveToFragMO(hEff, VEff, FIndices, g = None):
 	if g is None:
-		VMOEff, g, TFrag = FragmentRHF(hEff, VEff, FIndices)
+		VMOEff, g, TFrag, RDM2 = FragmentRHF(hEff, VEff, FIndices)
 	else:
-		VMOEff, gTMP, TFrag = FragmentRHF(hEff, VEff, FIndices)
+		VMOEff, gTMP, TFrag, RDM2 = FragmentRHF(hEff, VEff, FIndices)
 	tEff = MaketEff(VMOEff, g)
 	#nOcc = tEff.shape[0]
 	#nVir = tEff.shape[2]
 	#VMOEff_VVVV = VMOEff[nOcc:, nOcc:, nOcc:, nOcc:]
 	#Unkn = TwoConditionsOOVV(VMOEff_VVVV, tEff, TFrag)
-	return VMOEff, tEff, TFrag
+	return VMOEff, tEff, TFrag, RDM2
 
 # Contains variables required for Loss calculation that only need to be calculated once
 def GetConditions(VEff, hEff, VMO, tMO, TFragOcc, TFragVir, FIndices):
@@ -231,6 +240,7 @@ def LossPacked(VEff, hEff, FIndices, Conds, gAndMO = None):
 	else:
 		# The first part is for fixed T and g. Second part is for fixed g only.
 		if FixT:
+			tmp1, tmp2, tmp3, RDM2 = ERIEffectiveToFragMO(hEff, VEff, FIndices)
 			VMOEff = np.einsum('ijkl,ip,jq,kr,ls->pqrs', VEff, gAndMO[1], gAndMO[1], gAndMO[1], gAndMO[1])
 			TFragEff = gAndMO[1].T[:, FIndices]
 			tEff = MaketEff(VMOEff, gAndMO[0])
@@ -240,13 +250,17 @@ def LossPacked(VEff, hEff, FIndices, Conds, gAndMO = None):
 	nVirEff = tEff.shape[2]
 	TFragEffOcc = TFragEff[:nOccEff, :]
 	TFragEffVir = TFragEff[nOccEff:, :]
-	dbgA(gAndMO[1].T, gAndMO[0], nOccEff, nVirEff, [0, 1])
+	#dbgA(gAndMO[1].T, gAndMO[0], nOccEff, nVirEff, [0, 1])
 	VMOEff_VVVV = VMOEff[nOccEff:, nOccEff:, nOccEff:, nOccEff:]
 	VMOEff_OVOV = VMOEff[:nOccEff, nOccEff:, :nOccEff, nOccEff:]
 	UnknOOVV = TwoConditionsOOVV(VMOEff_VVVV, tEff, TFragEffOcc, TFragEffVir)
 	UnknOOOO = TwoConditionsOOOO(VMOEff_OVOV, tEff, TFragEffOcc)
 	UnknVVVV = TwoConditionsVVVV(VMOEff_OVOV, tEff, TFragEffVir)
 	UnknOOVVMix = TwoConditionsOOVVMix(VMOEff_OVOV, tEff, TFragEffOcc, TFragEffVir)
+
+	RDM2Frag = np.einsum('ijkl,ip,jq,kr,ls->pqrs', RDM2, TFragEff, TFragEff, TFragEff, TFragEff)
+	print(RDM2Frag)
+	UnknOOOO = RDM2Frag
 
 	#print(Conds)
 	#print(UnknOOVV, UnknOOOO, UnknVVVV, UnknOOVVMix)
@@ -328,7 +342,7 @@ def NewtonRaphson(f, x0, df, args, tol = 1e-6, alp = 1e0, eps = 1e-6):
 		input()
 	return x
 
-def MP2MLEmbedding(hEff, VMO, tMO, TFragOcc, TFragVir, FIndices, VEff0 = None, gFixed = False):
+def MP2MLEmbedding(hEff, VMO, tMO, TFragOcc, TFragVir, FIndices, VEff0 = None, gFixed = False, RDM2 = None):
 	N = 2 * int(len(FIndices))
 	nFrag = len(FIndices)
 	BIndices = [i + nFrag for i in FIndices]
@@ -357,23 +371,24 @@ def MP2MLEmbedding(hEff, VMO, tMO, TFragOcc, TFragVir, FIndices, VEff0 = None, g
 
 	# Get Conditions which are fixed.
 	Conds = GetConditions(VEff, hEff, VMO, tMO, TFragOcc, TFragVir, FIndices)
+	Conds[1] = RDM2
 
 	# Do RHF to get a fixed g, if desired.
 	if gFixed:
-		VMOEff, g, TFragEff, CMOEff = FragmentRHF(hEff, VEff, FIndices, ReturnMO = True)
+		VMOEff, g, TFragEff, CMOEff, G = FragmentRHF(hEff, VEff, FIndices, ReturnMO = True)
 		gAndMO = [g, CMOEff]
 	else:
 		gAndMO = None
 
 	#VEffVec = np.random.rand(VEffVec.shape[0],)
-	#scan_start = -2.
-	#scan_end = 2.
-	#step_size = 0.25
-	#steps = int((scan_end - scan_start)/step_size) + 1
-	#f = open('scan.txt', 'w')
-	#for i in range(steps):
-	#	L0 = Loss(np.asarray([0, 0, 0, scan_start + i * step_size]), hEff, FIndices, BIndices, [VFFFF, VBBBB], Conds, gAndMO)
-	#	f.write("%f\t%f\t%f\t%f\t%f\n" % (scan_start + i * step_size, L0[0], L0[1], L0[2], L0[3]))
+	scan_start = -2.
+	scan_end = 2.
+	step_size = 0.25
+	steps = int((scan_end - scan_start)/step_size) + 1
+	f = open('scan.txt', 'w')
+	for i in range(steps):
+		L0 = Loss(np.asarray([0, scan_start + i * step_size, 0, 0]), hEff, FIndices, BIndices, [VFFFF, VBBBB], Conds, gAndMO)
+		f.write("%f\t%f\t%f\t%f\t%f\n" % (scan_start + i * step_size, L0[0], L0[1], L0[2], L0[3]))
 	#	for j in range(steps):
 	#		for k in range(steps):
 	#			for l in range(steps):
@@ -505,9 +520,10 @@ if __name__ == '__main__':
 	#tMO_Occ = np.zeros((Norb, Norb, Norb, Norb))
 	#tMO_Vir = np.zeros((Norb, Norb, Norb, Norb))
 
-	print(TFragOccMOtoSO)
+	RDM2_MO = mp2.make_rdm2()
+	RDM2 = np.einsum('ijkl,ip,jq,kr,ls->pqrs', RDM2_MO, TFragMOtoSO, TFragMOtoSO, TFragMOtoSO, TFragMOtoSO)
 
-	MP2MLEmbedding(hFrag, VMO, t2, TFragOccMOtoSO, TFragVirMOtoSO, FIndices, VEff0 = VFrag, gFixed = True)
+	MP2MLEmbedding(hFrag, VMO, t2, TFragOccMOtoSO, TFragVirMOtoSO, FIndices, VEff0 = VFrag, gFixed = True, RDM2 = RDM2)
 	
 	#tZero = np.zeros((Norb, Norb, Norb, Norb))
 	#testMFBath = MP2Bath(tZero, FIndex, BIndex, EIndex, PSch, PEnv, hSO, VSO)
