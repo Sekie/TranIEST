@@ -51,21 +51,12 @@ def FragmentRHF(hEff, VEff, FIndices, ReturnMO = False):
 	#	print("DIIS did not converge, trying RCA")
 	#	e, P = doRCA(mf, rca_space = 2)
 	#	mf.kernel(P)
-	P = mf.make_rdm1()
-	print(P[1, 1] * P[0, 0] - P[1, 0]**2.)
-	G = np.zeros((P.shape[0], P.shape[0], P.shape[0], P.shape[0]))
-	for i in range(P.shape[0]):
-		for j in range(P.shape[0]):
-			for k in range(P.shape[0]):
-				for l in range(P.shape[0]):
-					G[i, j, k, l] = P[i, j] * P[k, l] - P[i, l] * P[k, j]
-	print(G)
 
 	VMOEff = np.einsum('ijkl,ip,jq,kr,ls->pqrs', VEff, mf.mo_coeff, mf.mo_coeff, mf.mo_coeff, mf.mo_coeff)
 	TFrag = mf.mo_coeff.T[:, FIndices]
 	if ReturnMO:
-		return VMOEff, mf.mo_energy, TFrag, mf.mo_coeff, G
-	return VMOEff, mf.mo_energy, TFrag, G
+		return VMOEff, mf.mo_energy, TFrag, mf.mo_coeff
+	return VMOEff, mf.mo_energy, TFrag
 
 # Takes VEff in the fragment MO basis, and assumes half filling. Returns a four index array where the first two indices
 # are the occupied orbitals and the last two indices are the virtual orbitals
@@ -194,15 +185,15 @@ def OneConditionsVV(VSO_OOVV, tSO, SIndices):
 
 def ERIEffectiveToFragMO(hEff, VEff, FIndices, g = None):
 	if g is None:
-		VMOEff, g, TFrag, RDM2 = FragmentRHF(hEff, VEff, FIndices)
+		VMOEff, g, TFrag = FragmentRHF(hEff, VEff, FIndices)
 	else:
-		VMOEff, gTMP, TFrag, RDM2 = FragmentRHF(hEff, VEff, FIndices)
+		VMOEff, gTMP, TFrag = FragmentRHF(hEff, VEff, FIndices)
 	tEff = MaketEff(VMOEff, g)
 	#nOcc = tEff.shape[0]
 	#nVir = tEff.shape[2]
 	#VMOEff_VVVV = VMOEff[nOcc:, nOcc:, nOcc:, nOcc:]
 	#Unkn = TwoConditionsOOVV(VMOEff_VVVV, tEff, TFrag)
-	return VMOEff, tEff, TFrag, RDM2
+	return VMOEff, tEff, TFrag
 
 # Contains variables required for Loss calculation that only need to be calculated once
 def GetConditions(VEff, hEff, VMO, tMO, TFragOcc, TFragVir, FIndices):
@@ -240,7 +231,6 @@ def LossPacked(VEff, hEff, FIndices, Conds, gAndMO = None):
 	else:
 		# The first part is for fixed T and g. Second part is for fixed g only.
 		if FixT:
-			tmp1, tmp2, tmp3, RDM2 = ERIEffectiveToFragMO(hEff, VEff, FIndices)
 			VMOEff = np.einsum('ijkl,ip,jq,kr,ls->pqrs', VEff, gAndMO[1], gAndMO[1], gAndMO[1], gAndMO[1])
 			TFragEff = gAndMO[1].T[:, FIndices]
 			tEff = MaketEff(VMOEff, gAndMO[0])
@@ -257,10 +247,6 @@ def LossPacked(VEff, hEff, FIndices, Conds, gAndMO = None):
 	UnknOOOO = TwoConditionsOOOO(VMOEff_OVOV, tEff, TFragEffOcc)
 	UnknVVVV = TwoConditionsVVVV(VMOEff_OVOV, tEff, TFragEffVir)
 	UnknOOVVMix = TwoConditionsOOVVMix(VMOEff_OVOV, tEff, TFragEffOcc, TFragEffVir)
-
-	RDM2Frag = np.einsum('ijkl,ip,jq,kr,ls->pqrs', RDM2, TFragEff, TFragEff, TFragEff, TFragEff)
-	print(RDM2Frag)
-	UnknOOOO = RDM2Frag
 
 	#print(Conds)
 	#print(UnknOOVV, UnknOOOO, UnknVVVV, UnknOOVVMix)
@@ -342,7 +328,7 @@ def NewtonRaphson(f, x0, df, args, tol = 1e-6, alp = 1e0, eps = 1e-6):
 		input()
 	return x
 
-def MP2MLEmbedding(hEff, VMO, tMO, TFragOcc, TFragVir, FIndices, VEff0 = None, gFixed = False, RDM2 = None):
+def MP2MLEmbedding(hEff, VMO, tMO, TFragOcc, TFragVir, FIndices, VEff0 = None, gFixed = False):
 	N = 2 * int(len(FIndices))
 	nFrag = len(FIndices)
 	BIndices = [i + nFrag for i in FIndices]
@@ -371,11 +357,10 @@ def MP2MLEmbedding(hEff, VMO, tMO, TFragOcc, TFragVir, FIndices, VEff0 = None, g
 
 	# Get Conditions which are fixed.
 	Conds = GetConditions(VEff, hEff, VMO, tMO, TFragOcc, TFragVir, FIndices)
-	Conds[1] = RDM2
 
 	# Do RHF to get a fixed g, if desired.
 	if gFixed:
-		VMOEff, g, TFragEff, CMOEff, G = FragmentRHF(hEff, VEff, FIndices, ReturnMO = True)
+		VMOEff, g, TFragEff, CMOEff = FragmentRHF(hEff, VEff, FIndices, ReturnMO = True)
 		gAndMO = [g, CMOEff]
 	else:
 		gAndMO = None
@@ -520,10 +505,7 @@ if __name__ == '__main__':
 	#tMO_Occ = np.zeros((Norb, Norb, Norb, Norb))
 	#tMO_Vir = np.zeros((Norb, Norb, Norb, Norb))
 
-	RDM2_MO = mp2.make_rdm2()
-	RDM2 = np.einsum('ijkl,ip,jq,kr,ls->pqrs', RDM2_MO, TFragMOtoSO, TFragMOtoSO, TFragMOtoSO, TFragMOtoSO)
-
-	MP2MLEmbedding(hFrag, VMO, t2, TFragOccMOtoSO, TFragVirMOtoSO, FIndices, VEff0 = VFrag, gFixed = True, RDM2 = RDM2)
+	MP2MLEmbedding(hFrag, VMO, t2, TFragOccMOtoSO, TFragVirMOtoSO, FIndices, VEff0 = VFrag, gFixed = True)
 	
 	#tZero = np.zeros((Norb, Norb, Norb, Norb))
 	#testMFBath = MP2Bath(tZero, FIndex, BIndex, EIndex, PSch, PEnv, hSO, VSO)
