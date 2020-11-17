@@ -228,6 +228,7 @@ def GetConditions(VEff, hEff, VMO, tMO, TFragOcc, TFragVir, FIndices):
 	CondOOOO2e = TwoConditionsOOOO2e(VMO_OOOO, tMO, TFragOcc, TFragVir)
 	CondOOOO1e = TwoConditionsOOOO1e(VMO_OOOO, tMO, TFragOcc, TFragVir)
 
+	#return [CondOOVV, CondVVVV1e, CondVVVV, CondOOVVMix] 
 	return [CondOOVV, CondOOOO, CondVVVV, CondOOVVMix, CondVVVV1e, CondOOOO2e, CondOOOO1e]
 
 def LossPacked(VEff, hEff, FIndices, Conds, gAndMO = None):
@@ -274,6 +275,7 @@ def LossPacked(VEff, hEff, FIndices, Conds, gAndMO = None):
 
 	#print(Conds)
 	#print(UnknOOVV, UnknOOOO, UnknVVVV, UnknOOVVMix)
+	#Loss = [UnknOOVV - Conds[0], UnknVVVV1e - Conds[1], UnknVVVV - Conds[2], UnknOOVVMix - Conds[3]]
 	Loss = [UnknOOVV - Conds[0], UnknOOOO - Conds[1], UnknVVVV - Conds[2], UnknOOVVMix - Conds[3], UnknVVVV1e - Conds[4], UnknOOOO2e - Conds[5], UnknOOOO1e - Conds[6]]
 	return Loss
 	
@@ -291,7 +293,8 @@ def Loss(VEffVec, hEff, FIndices, BIndices, VUnmatched, Conds, gAndMO = None):
 def dLoss(VEffVec, hEff, FIndices, BIndices, VUnmatched, Conds, gAndMO):
 	dV = 0.0001
 	Loss0 = Loss(VEffVec, hEff, FIndices, BIndices, VUnmatched, Conds, gAndMO)
-	J = np.zeros((VEffVec.shape[0], VEffVec.shape[0]))
+	J = np.zeros((Loss0.shape[0], VEffVec.shape[0]))
+	J = J.T
 	for i in range(VEffVec.shape[0]):
 		VEffVecPlusdV = VEffVec.copy()
 		VEffVecMinsdV = VEffVec.copy()
@@ -328,7 +331,7 @@ def BacktrackLineSearch(f, x, dx, args, beta = 0.5, y0 = None):
 	return xTest, y
 	
 
-def NewtonRaphson(f, x0, df, args, tol = 1e-6, alp = 1e0, eps = 1e-6):
+def NewtonRaphson(f, x0, df, args, tol = 1e-6, eps = 1e-6):
 	F = f(x0, *args)
 	x = x0.copy()
 	while not all([abs(x) < tol for x in F]):
@@ -351,6 +354,16 @@ def NewtonRaphson(f, x0, df, args, tol = 1e-6, alp = 1e0, eps = 1e-6):
 		print("L =", F)
 		input()
 	return x
+
+def GaussNewton(f, x0, df, args, tol = 1e-6):
+	F = f(x0, *args)
+	x = x0.copy()
+	while (F**2.0).sum() > tol:
+		J = df(x, *args)
+		x = x - np.linalg.inv(J.T @ J) @ J.T @ F
+		F = f(x, *args)
+		print(F)
+		input()
 
 def MP2MLEmbedding(hEff, VMO, tMO, TFragOcc, TFragVir, FIndices, VEff0 = None, gFixed = False):
 	N = 2 * int(len(FIndices))
@@ -396,13 +409,13 @@ def MP2MLEmbedding(hEff, VMO, tMO, TFragOcc, TFragVir, FIndices, VEff0 = None, g
 	steps = int((scan_end - scan_start)/step_size) + 1
 	f = open('scan.txt', 'w')
 	for i in range(steps):
-		L0 = Loss(np.asarray([scan_start + i * step_size, 0, 0, 0]), hEff, FIndices, BIndices, [VFFFF, VBBBB], Conds, gAndMO)
-		f.write("%f\t%f\t%f\t%f\n" % (scan_start + i * step_size, L0[4], L0[5], L0[6]))
-	#	for j in range(steps):
-	#		for k in range(steps):
-	#			for l in range(steps):
-	#				L0 = Loss(np.asarray([scan_start + i * step_size, scan_start + j * step_size, scan_start + k * step_size, scan_start + l * step_size]), hEff, FIndices, BIndices, [VFFFF, VBBBB], Conds, gAndMO)
-	#				f.write("%f\t%f\t%f\t%f\t%f\t%f\t%f\t%f\n" % (scan_start + i * step_size, scan_start + j * step_size, scan_start + k * step_size, scan_start + l * step_size, L0[0], L0[1], L0[2], L0[3]))
+	#	L0 = Loss(np.asarray([0, 0, 0, scan_start + i * step_size]), hEff, FIndices, BIndices, [VFFFF, VBBBB], Conds, gAndMO)
+	#	f.write("%f\t%f\t%f\t%f\t%f\t%f\t%f\t%f\n" % (scan_start + i * step_size, L0[0], L0[1], L0[2], L0[3], L0[4], L0[5], L0[6]))
+		for j in range(steps):
+			for k in range(steps):
+				for l in range(steps):
+					L0 = Loss(np.asarray([scan_start + i * step_size, scan_start + j * step_size, scan_start + k * step_size, scan_start + l * step_size]), hEff, FIndices, BIndices, [VFFFF, VBBBB], Conds, gAndMO)
+					f.write("%f\t%f\t%f\t%f\t%f\t%f\t%f\t%f\n" % (scan_start + i * step_size, scan_start + j * step_size, scan_start + k * step_size, scan_start + l * step_size, L0[0], L0[1], L0[2], L0[3]))
 	L1 = Loss(np.asarray([1., 0., 0., 0.]), hEff, FIndices, BIndices, [VFFFF, VBBBB], Conds, gAndMO)
 	L2 = Loss(np.asarray([0., 1., 0., 0.]), hEff, FIndices, BIndices, [VFFFF, VBBBB], Conds, gAndMO)
 	L3 = Loss(np.asarray([0., 0., 1., 0.]), hEff, FIndices, BIndices, [VFFFF, VBBBB], Conds, gAndMO)
@@ -411,7 +424,8 @@ def MP2MLEmbedding(hEff, VMO, tMO, TFragOcc, TFragVir, FIndices, VEff0 = None, g
 	print(L2)
 	print(L3)
 	print(L4)
-	VEffFinal = NewtonRaphson(Loss, VEffVec, dLoss, [hEff, FIndices, BIndices, [VFFFF, VBBBB], Conds, gAndMO])
+	#VEffFinal = NewtonRaphson(Loss, VEffVec, dLoss, [hEff, FIndices, BIndices, [VFFFF, VBBBB], Conds, gAndMO])
+	VEffFinal = GaussNewton(Loss, VEffVec, dLoss, [hEff, FIndices, BIndices, [VFFFF, VBBBB], Conds, gAndMO])
 	#VEffFinal = newton(Loss, VEffVec, args = [hEff, FIndices, BIndices, [VFFFF, VBBBB], Conds, gAndMO], fprime = dLoss, maxiter = 50)
 
 def CombinedIndex(Indices, nFB):
