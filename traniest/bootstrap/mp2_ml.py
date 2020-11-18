@@ -152,39 +152,51 @@ def MakeLossVector(Losses):
 						LossVec[i + j * Loss.shape[0] + k * Loss.shape[0] * Loss.shape[1] + l * Loss.shape[0] * Loss.shape[1] * Loss.shape[3]] = Loss[i, j, k, l]
 		LossesVec = np.concatenate((LossesVec, LossVec))
 	return LossesVec
+
+# Antisymmetrizes TEI in chemists notation
+def AntiSymV(V):
+	V2 = np.swapaxes(V, 1, 3)
+	return 2.0 * V - V2
 			
 def TwoConditionsOOVV(VMO_VVVV, tMO, TFragOcc, TFragVir):
-	CondMO = np.einsum('acbd,ijcd->ijab', VMO_VVVV, tMO)
+	VMO = AntiSymV(VMO_VVVV)
+	CondMO = np.einsum('acbd,ijcd->ijab', VMO, tMO)
 	Cond = np.einsum('ijab,ip,jq,ar,bs->prqs', CondMO, TFragOcc, TFragOcc, TFragVir, TFragVir)
 	return Cond
 
 def TwoConditionsOOOO(VMO_OVOV, tMO, TFragOcc):
-	CondMO = np.einsum('kcld,ijcd->ijkl', VMO_OVOV, tMO)
+	VMO = AntiSymV(VMO_OVOV)
+	CondMO = np.einsum('kcld,ijcd->ijkl', VMO, tMO)
 	Cond = np.einsum('ijkl,ip,jq,kr,ls->prqs', CondMO, TFragOcc, TFragOcc, TFragOcc, TFragOcc)
 	return Cond
 
 def TwoConditionsVVVV(VMO_OVOV, tMO, TFragVir):
-	CondMO = np.einsum('kcld,klab->abcd', VMO_OVOV, tMO)
+	VMO = AntiSymV(VMO_OVOV)
+	CondMO = np.einsum('kcld,klab->abcd', VMO, tMO)
 	Cond = np.einsum('abcd,ap,bq,cr,ds->prqs', CondMO, TFragVir, TFragVir, TFragVir, TFragVir)
 	return Cond
 
 def TwoConditionsOOVVMix(VMO_OVOV, tMO, TFragOcc, TFragVir):
-	CondMO = np.einsum('iakc,kjcb->ijab', VMO_OVOV, tMO)
+	VMO = AntiSymV(VMO_OVOV)
+	CondMO = np.einsum('iakc,kjcb->ijab', VMO, tMO)
 	Cond = np.einsum('ijab,ip,jq,ar,bs->prqs', CondMO, TFragOcc, TFragOcc, TFragVir, TFragVir)
 	return Cond
 
 def TwoConditionsVVVV1e(VMO_VVVV, tMO, TFragOcc, TFragVir):
-	CondMO = np.einsum('abcd,ijcd->ijab', VMO_VVVV, tMO)
+	VMO = AntiSymV(VMO_VVVV)
+	CondMO = np.einsum('abcd,ijcd->ijab', VMO, tMO)
 	Cond = np.einsum('ijab,ip,jq,ar,bs->prqs', CondMO, TFragOcc, TFragOcc, TFragVir, TFragVir)
 	return Cond
 
 def TwoConditionsOOOO2e(VMO_OOOO, tMO, TFragOcc, TFragVir):
-	CondMO = np.einsum('ikjl,klab->ijab', VMO_OOOO, tMO)
+	VMO = AntiSymV(VMO_OOOO)
+	CondMO = np.einsum('ikjl,klab->ijab', VMO, tMO)
 	Cond = np.einsum('ijab,ip,jq,ar,bs->prqs', CondMO, TFragOcc, TFragOcc, TFragVir, TFragVir)
 	return Cond
 
 def TwoConditionsOOOO1e(VMO_OOOO, tMO, TFragOcc, TFragVir):
-	CondMO = np.einsum('ijkl,klab->ijab', VMO_OOOO, tMO)
+	VMO = AntiSymV(VMO_OOOO)
+	CondMO = np.einsum('ijkl,klab->ijab', VMO, tMO)
 	Cond = np.einsum('ijab,ip,jq,ar,bs->prqs', CondMO, TFragOcc, TFragOcc, TFragVir, TFragVir)
 	return Cond
 
@@ -229,6 +241,7 @@ def GetConditions(VEff, hEff, VMO, tMO, TFragOcc, TFragVir, FIndices):
 	CondOOOO1e = TwoConditionsOOOO1e(VMO_OOOO, tMO, TFragOcc, TFragVir)
 
 	#return [CondOOVV, CondVVVV1e, CondVVVV, CondOOVVMix] 
+	#return [CondOOVV, CondVVVV, CondOOVVMix, CondVVVV1e]#, CondOOOO2e, CondOOOO1e]
 	return [CondOOVV, CondOOOO, CondVVVV, CondOOVVMix, CondVVVV1e, CondOOOO2e, CondOOOO1e]
 
 def LossPacked(VEff, hEff, FIndices, Conds, gAndMO = None):
@@ -276,6 +289,7 @@ def LossPacked(VEff, hEff, FIndices, Conds, gAndMO = None):
 	#print(Conds)
 	#print(UnknOOVV, UnknOOOO, UnknVVVV, UnknOOVVMix)
 	#Loss = [UnknOOVV - Conds[0], UnknVVVV1e - Conds[1], UnknVVVV - Conds[2], UnknOOVVMix - Conds[3]]
+	#Loss = [UnknOOVV - Conds[0], UnknVVVV - Conds[1], UnknOOVVMix - Conds[2], UnknVVVV1e - Conds[3]]#, UnknOOOO2e - Conds[4], UnknOOOO1e - Conds[5]]
 	Loss = [UnknOOVV - Conds[0], UnknOOOO - Conds[1], UnknVVVV - Conds[2], UnknOOVVMix - Conds[3], UnknVVVV1e - Conds[4], UnknOOOO2e - Conds[5], UnknOOOO1e - Conds[6]]
 	return Loss
 	
@@ -352,6 +366,7 @@ def NewtonRaphson(f, x0, df, args, tol = 1e-6, eps = 1e-6):
 		#F = f(x, *args)
 		print("x =", x)
 		print("L =", F)
+		print((F**2.0).sum())
 		input()
 	return x
 
@@ -363,7 +378,25 @@ def GaussNewton(f, x0, df, args, tol = 1e-6):
 		x = x - np.linalg.inv(J.T @ J) @ J.T @ F
 		F = f(x, *args)
 		print(F)
+		print((F**2.0).sum())
 		input()
+
+def LevenbergMarquardt(f, x0, df, args, tol = 1e-6, lamb = 1e-6):
+	F = f(x0, *args)
+	x = x0.copy()
+	while (F**2.0).sum() > tol:
+		J = df(x, *args)
+		JTJ = J.T @ J
+		Norm = np.zeros(JTJ.shape)
+		np.fill_diagonal(Norm, np.diag(JTJ))
+		A = (JTJ + lamb * Norm)
+		delta = np.linalg.solve(A, J.T @ F)
+		x = x - delta
+		F = f(x, *args)
+		print(F)
+		print((F**2.0).sum())
+		input()
+
 
 def MP2MLEmbedding(hEff, VMO, tMO, TFragOcc, TFragVir, FIndices, VEff0 = None, gFixed = False):
 	N = 2 * int(len(FIndices))
@@ -407,15 +440,15 @@ def MP2MLEmbedding(hEff, VMO, tMO, TFragOcc, TFragVir, FIndices, VEff0 = None, g
 	scan_end = 2.
 	step_size = 0.25
 	steps = int((scan_end - scan_start)/step_size) + 1
-	f = open('scan.txt', 'w')
-	for i in range(steps):
+	#f = open('scan.txt', 'w')
+	#for i in range(steps):
 	#	L0 = Loss(np.asarray([0, 0, 0, scan_start + i * step_size]), hEff, FIndices, BIndices, [VFFFF, VBBBB], Conds, gAndMO)
 	#	f.write("%f\t%f\t%f\t%f\t%f\t%f\t%f\t%f\n" % (scan_start + i * step_size, L0[0], L0[1], L0[2], L0[3], L0[4], L0[5], L0[6]))
-		for j in range(steps):
-			for k in range(steps):
-				for l in range(steps):
-					L0 = Loss(np.asarray([scan_start + i * step_size, scan_start + j * step_size, scan_start + k * step_size, scan_start + l * step_size]), hEff, FIndices, BIndices, [VFFFF, VBBBB], Conds, gAndMO)
-					f.write("%f\t%f\t%f\t%f\t%f\t%f\t%f\t%f\n" % (scan_start + i * step_size, scan_start + j * step_size, scan_start + k * step_size, scan_start + l * step_size, L0[0], L0[1], L0[2], L0[3]))
+	#	for j in range(steps):
+	#		for k in range(steps):
+	#			for l in range(steps):
+	#				L0 = Loss(np.asarray([scan_start + i * step_size, scan_start + j * step_size, scan_start + k * step_size, scan_start + l * step_size]), hEff, FIndices, BIndices, [VFFFF, VBBBB], Conds, gAndMO)
+	#				f.write("%f\t%f\t%f\t%f\t%f\t%f\t%f\t%f\n" % (scan_start + i * step_size, scan_start + j * step_size, scan_start + k * step_size, scan_start + l * step_size, L0[0], L0[1], L0[2], L0[3]))
 	L1 = Loss(np.asarray([1., 0., 0., 0.]), hEff, FIndices, BIndices, [VFFFF, VBBBB], Conds, gAndMO)
 	L2 = Loss(np.asarray([0., 1., 0., 0.]), hEff, FIndices, BIndices, [VFFFF, VBBBB], Conds, gAndMO)
 	L3 = Loss(np.asarray([0., 0., 1., 0.]), hEff, FIndices, BIndices, [VFFFF, VBBBB], Conds, gAndMO)
@@ -424,8 +457,9 @@ def MP2MLEmbedding(hEff, VMO, tMO, TFragOcc, TFragVir, FIndices, VEff0 = None, g
 	print(L2)
 	print(L3)
 	print(L4)
+	VEffVec = np.zeros(VEffVec.shape)
 	#VEffFinal = NewtonRaphson(Loss, VEffVec, dLoss, [hEff, FIndices, BIndices, [VFFFF, VBBBB], Conds, gAndMO])
-	VEffFinal = GaussNewton(Loss, VEffVec, dLoss, [hEff, FIndices, BIndices, [VFFFF, VBBBB], Conds, gAndMO])
+	VEffFinal = LevenbergMarquardt(Loss, VEffVec, dLoss, [hEff, FIndices, BIndices, [VFFFF, VBBBB], Conds, gAndMO])
 	#VEffFinal = newton(Loss, VEffVec, args = [hEff, FIndices, BIndices, [VFFFF, VBBBB], Conds, gAndMO], fprime = dLoss, maxiter = 50)
 
 def CombinedIndex(Indices, nFB):
