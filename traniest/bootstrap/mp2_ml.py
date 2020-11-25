@@ -27,6 +27,69 @@ def PermuteAABB(V, AIndex, BIndex):
 	VAABB = V[np.ix_(AIndex, AIndex, BIndex, BIndex)]
 	V[np.ix_(BIndex, BIndex, AIndex, AIndex)] = VAABB
 
+def make_rhf_rdm2(P):
+	n = P.shape[0]
+	G = np.zeros((n, n, n, n))
+	for i in range(n):
+		for j in range(n):
+			G[i, j] = (2.0 * P[i, j] * P - np.outer(P[i], P[j]))[:n, :n]
+			G[i, j][np.diag_indices(n)] *= 0.5
+			G[i, j] += G[i, j].T
+	return G
+
+def CalcFragEnergy(h, hcore, V, P, G, CenterIndices):
+	FragE = 0.0
+	n = h.shape[0]
+	E1 = 0.0
+	E2 = 0.0
+	for i in CenterIndices:
+		for j in range(n):
+			FragE += 0.5 * (h[i, j] + hcore[i, j]) * P[i, j]
+			E1 += 0.5 * (h[i, j] + hcore[i, j]) * P[i, j]
+			for k in range(n):
+				for l in range(n):
+					FragE += 0.5 * G[i, j, k, l] * V[i, j, k, l]
+					E2 += 0.5 * G[i, j, k, l] * V[i, j, k, l]
+	return FragE
+
+
+def FragmentRFCI(h, hcore, V, CenterIndices, S = None):
+	from pyscf import fci
+	n = hcore.shape[0]
+	nocc = int(n/2)
+	cisolver = fci.direct_spin0.FCI()
+	cisolver.verbose = 5
+	e, fcivec = cisolver.kernel(hcore, V, hcore.shape[0], (nocc, nocc))
+	P, G = cisolver.make_rdm12(fcivec, n, (nocc, nocc))
+	FragE = CalcFragEnergy(h, hcore, V, P, G, CenterIndices)
+	return FragE
+
+def FragmentRMP2(h, hcore, V, CenterIndices, S = None):
+	if S is None:
+		S = np.eye(h.shape[0])
+	mol = gto.M()
+	n = h.shape[0]
+	mol.nelectron = n
+
+	mf = scf.RHF(mol)
+	mf.get_hcore = lambda *args: hcore
+	mf.get_ovlp = lambda *args: S
+	mf._eri = ao2mo.restore(8, V, n)
+	mf.max_cycle = 1000
+
+	mf.kernel()
+	C = mf.mo_coeff
+	
+	mp2 = mp.MP2(mf)
+	E, T2 = mp2.kernel()
+	P = mp2.make_rdm1()
+	P = C @ P @ C.T
+	G = mp2.make_rdm2()
+	G = np.einsum('ijkl,ip,jq,kr,ls->pqrs', G, C, C, C, C)
+	FragE = CalcFragEnergy(h, hcore, V, P, G, CenterIndices)
+	return FragE
+
+
 def FragmentRHF(hEff, VEff, FIndices, ReturnMO = False):
 	mol = gto.M()
 	nElec = hEff.shape[0] # Half occupied fragment
@@ -240,9 +303,9 @@ def GetConditions(VEff, hEff, VMO, tMO, TFragOcc, TFragVir, FIndices):
 	CondOOOO2e = TwoConditionsOOOO2e(VMO_OOOO, tMO, TFragOcc, TFragVir)
 	CondOOOO1e = TwoConditionsOOOO1e(VMO_OOOO, tMO, TFragOcc, TFragVir)
 
-	#return [CondOOVV, CondVVVV1e, CondVVVV, CondOOVVMix] 
-	#return [CondOOVV, CondVVVV, CondOOVVMix, CondVVVV1e]#, CondOOOO2e, CondOOOO1e]
-	return [CondOOVV, CondOOOO, CondVVVV, CondOOVVMix, CondVVVV1e, CondOOOO2e, CondOOOO1e]
+	#return [CondOOVV, CondVVVV1e, CondOOOO2e, CondOOOO1e] 
+	return [CondOOVV, CondVVVV, CondOOOO2e]#, CondOOOO2e, CondOOOO1e]
+	#return [CondOOVV, CondOOOO, CondVVVV, CondOOVVMix, CondVVVV1e, CondOOOO2e, CondOOOO1e]
 
 def LossPacked(VEff, hEff, FIndices, Conds, gAndMO = None):
 	#nOcc = tMO.shape[0]
@@ -288,9 +351,9 @@ def LossPacked(VEff, hEff, FIndices, Conds, gAndMO = None):
 
 	#print(Conds)
 	#print(UnknOOVV, UnknOOOO, UnknVVVV, UnknOOVVMix)
-	#Loss = [UnknOOVV - Conds[0], UnknVVVV1e - Conds[1], UnknVVVV - Conds[2], UnknOOVVMix - Conds[3]]
-	#Loss = [UnknOOVV - Conds[0], UnknVVVV - Conds[1], UnknOOVVMix - Conds[2], UnknVVVV1e - Conds[3]]#, UnknOOOO2e - Conds[4], UnknOOOO1e - Conds[5]]
-	Loss = [UnknOOVV - Conds[0], UnknOOOO - Conds[1], UnknVVVV - Conds[2], UnknOOVVMix - Conds[3], UnknVVVV1e - Conds[4], UnknOOOO2e - Conds[5], UnknOOOO1e - Conds[6]]
+	#Loss = [UnknOOVV - Conds[0], UnknVVVV1e - Conds[1], UnknOOOO2e - Conds[2], UnknOOOO1e - Conds[3]]
+	Loss = [UnknOOVV - Conds[0], UnknVVVV - Conds[1], UnknOOOO2e - Conds[2]]#, UnknOOOO2e - Conds[4], UnknOOOO1e - Conds[5]]
+	#Loss = [UnknOOVV - Conds[0], UnknOOOO - Conds[1], UnknVVVV - Conds[2], UnknOOVVMix - Conds[3], UnknVVVV1e - Conds[4], UnknOOOO2e - Conds[5], UnknOOOO1e - Conds[6]]
 	return Loss
 	
 def Loss(VEffVec, hEff, FIndices, BIndices, VUnmatched, Conds, gAndMO = None):
@@ -370,7 +433,7 @@ def NewtonRaphson(f, x0, df, args, tol = 1e-6, eps = 1e-6):
 		input()
 	return x
 
-def GaussNewton(f, x0, df, args, tol = 1e-6):
+def GaussNewton(f, x0, df, args, tol = 1e-12):
 	F = f(x0, *args)
 	x = x0.copy()
 	while (F**2.0).sum() > tol:
@@ -381,7 +444,7 @@ def GaussNewton(f, x0, df, args, tol = 1e-6):
 		print((F**2.0).sum())
 		input()
 
-def LevenbergMarquardt(f, x0, df, args, tol = 1e-6, lamb = 1e-6):
+def LevenbergMarquardt(f, x0, df, args, tol = 1e-12, lamb = 1e-6):
 	F = f(x0, *args)
 	x = x0.copy()
 	while (F**2.0).sum() > tol:
@@ -393,9 +456,11 @@ def LevenbergMarquardt(f, x0, df, args, tol = 1e-6, lamb = 1e-6):
 		delta = np.linalg.solve(A, J.T @ F)
 		x = x - delta
 		F = f(x, *args)
+		print(x)
 		print(F)
 		print((F**2.0).sum())
-		input()
+		#input()
+	return x
 
 
 def MP2MLEmbedding(hEff, VMO, tMO, TFragOcc, TFragVir, FIndices, VEff0 = None, gFixed = False):
@@ -436,13 +501,13 @@ def MP2MLEmbedding(hEff, VMO, tMO, TFragOcc, TFragVir, FIndices, VEff0 = None, g
 		gAndMO = None
 
 	#VEffVec = np.random.rand(VEffVec.shape[0],)
-	scan_start = -2.
-	scan_end = 2.
-	step_size = 0.25
-	steps = int((scan_end - scan_start)/step_size) + 1
+	#scan_start = -2.
+	#scan_end = 2.
+	#step_size = 0.25
+	#steps = int((scan_end - scan_start)/step_size) + 1
 	#f = open('scan.txt', 'w')
 	#for i in range(steps):
-	#	L0 = Loss(np.asarray([0, 0, 0, scan_start + i * step_size]), hEff, FIndices, BIndices, [VFFFF, VBBBB], Conds, gAndMO)
+	#	L0 = Loss(np.asarray([scan_start + i * step_size, 0, 0, 0]), hEff, FIndices, BIndices, [VFFFF, VBBBB], Conds, gAndMO)
 	#	f.write("%f\t%f\t%f\t%f\t%f\t%f\t%f\t%f\n" % (scan_start + i * step_size, L0[0], L0[1], L0[2], L0[3], L0[4], L0[5], L0[6]))
 	#	for j in range(steps):
 	#		for k in range(steps):
@@ -457,10 +522,15 @@ def MP2MLEmbedding(hEff, VMO, tMO, TFragOcc, TFragVir, FIndices, VEff0 = None, g
 	print(L2)
 	print(L3)
 	print(L4)
-	VEffVec = np.zeros(VEffVec.shape)
+	#VEffVec = np.zeros(VEffVec.shape)
 	#VEffFinal = NewtonRaphson(Loss, VEffVec, dLoss, [hEff, FIndices, BIndices, [VFFFF, VBBBB], Conds, gAndMO])
-	VEffFinal = LevenbergMarquardt(Loss, VEffVec, dLoss, [hEff, FIndices, BIndices, [VFFFF, VBBBB], Conds, gAndMO])
+	#VEffFinal = GaussNewton(Loss, VEffVec, dLoss, [hEff, FIndices, BIndices, [VFFFF, VBBBB], Conds, gAndMO])
+	VEffVecFinal = LevenbergMarquardt(Loss, VEffVec, dLoss, [hEff, FIndices, BIndices, [VFFFF, VBBBB], Conds, gAndMO], tol = 1e-20, lamb = 1e-10)
+	VEffFinal = VectorToVSymm(VEffVecFinal, FIndices, BIndices)
+	VEffFinal[np.ix_(FIndices, FIndices, FIndices, FIndices)] = VFFFF
+	VEffFinal[np.ix_(BIndices, BIndices, BIndices, BIndices)] = VBBBB
 	#VEffFinal = newton(Loss, VEffVec, args = [hEff, FIndices, BIndices, [VFFFF, VBBBB], Conds, gAndMO], fprime = dLoss, maxiter = 50)
+	return VEffFinal
 
 def CombinedIndex(Indices, nFB):
 	if len(Indices) == 2:
@@ -485,8 +555,10 @@ if __name__ == '__main__':
 	#		angle = angle + 0.8 * angle
 		mol.atom.append(('H', (r * np.sin(angle), r * np.cos(angle), 0)))
 	mol.basis = 'sto-3g'
-	mol.build(verbose = 0)
-	mf = scf.RHF(mol).run()
+	mol.build()
+	mf = scf.RHF(mol)
+	mf.kernel()
+	print("E_elec(HF) =", mf.e_tot - mf.energy_nuc())
 
 	nocc = int(np.sum(mf.mo_occ) / 2)
 
@@ -497,7 +569,7 @@ if __name__ == '__main__':
 	mo_occ = mo_coeff[:, :nocc]
 	mo_occ = np.dot(StoOrth.T, mo_occ)
 	P = np.dot(mo_occ, mo_occ.T)
-	Nf = 1 
+	Nf = 1
 	PFrag = P[:Nf, :Nf]
 	PEnvBath = P[Nf:, Nf:]
 	eEnv, vEnv = np.linalg.eigh(PEnvBath)
@@ -527,7 +599,7 @@ if __name__ == '__main__':
 	SIndices = FIndices + BIndices
 	CoreIdx = [i + Nf for i in CoreOrbs]
 
-	TTotal = np.dot(StoOrth, T)
+	TTotal = np.dot(StoOrig, T)
 	TMOtoAO = np.linalg.inv(mo_coeff)
 	TMOtoSO = np.dot(TMOtoAO, TTotal)
 	TFragMOtoSO = TMOtoSO[:, FIndices]
@@ -543,6 +615,7 @@ if __name__ == '__main__':
 
 	VFrag = VSO[SIndices, :, :, :][:, SIndices, :, :][:, :, SIndices, :][:, :, :, SIndices]
 	hFrag = hSO[SIndices, :][:, SIndices]
+	hNoCore = hFrag.copy()
 	for i in SIndices:
 		for j in SIndices:
 			CoreContribution = 0.0
@@ -552,7 +625,7 @@ if __name__ == '__main__':
 
 	mp2 = mp.MP2(mf)
 	E, T2 = mp2.kernel()
-	print("E(MP2) = ", mf.energy_elec()[0], E)
+	print("E_elec(MP2) =", mf.e_tot + E - mf.energy_nuc())
 
 	Nocc = T2.shape[0]
 	Nvir = T2.shape[2]
@@ -577,8 +650,11 @@ if __name__ == '__main__':
 	#tMO_Occ = np.zeros((Norb, Norb, Norb, Norb))
 	#tMO_Vir = np.zeros((Norb, Norb, Norb, Norb))
 
-	MP2MLEmbedding(hFrag, VMO, t2, TFragOccMOtoSO, TFragVirMOtoSO, FIndices, VEff0 = VFrag, gFixed = True)
-	
+	#VML = MP2MLEmbedding(hFrag, VMO, t2, TFragOccMOtoSO, TFragVirMOtoSO, FIndices, VEff0 = VFrag, gFixed = True)
+
+	FragE = FragmentRMP2(hNoCore, hFrag, VFrag, FIndices)
+	print(int(N / Nf) * FragE + mol.energy_nuc())
+	print(int(N / Nf) * FragE)
 	#tZero = np.zeros((Norb, Norb, Norb, Norb))
 	#testMFBath = MP2Bath(tZero, FIndex, BIndex, EIndex, PSch, PEnv, hSO, VSO)
 	#mf0, mf1, mf2 = testMFBath.CalcH()
