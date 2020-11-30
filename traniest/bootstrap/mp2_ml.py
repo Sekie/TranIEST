@@ -263,6 +263,35 @@ def TwoConditionsOOOO1e(VMO_OOOO, tMO, TFragOcc, TFragVir):
 	Cond = np.einsum('ijab,ip,jq,ar,bs->prqs', CondMO, TFragOcc, TFragOcc, TFragVir, TFragVir)
 	return Cond
 
+def TwoConditionsOOOV2e(VMO_OOOV, tMO, TFragOcc, TFragVir):
+	VMO = AntiSymV(VMO_OOOV)
+	CondMO = np.einsum('kila,klbc->iabc', VMO, tMO)
+	Cond = np.einsum('iabc,ip,aq,br,cs->prqs', CondMO, TFragOcc, TFragVir, TFragVir, TFragVir)
+	return Cond
+
+def TwoConditionsOVVV2e(VMO_OVVV, tMO, TFragOcc, TFragVir):
+	VMO = AntiSymV(VMO_OVVV)
+	CondMO = np.einsum('icad,jkcd->ijka', VMO, tMO)
+	Cond = np.einsum('ijka,ip,jq,kr,as->prqs', CondMO, TFragOcc, TFragOcc, TFragOcc, TFragVir)
+	return Cond
+
+def TwoConditionsMP3VVVV(VMO_VVVV, tMO, TFragOcc):
+	VMO = AntiSymV(VMO_VVVV)
+	CondMO = np.einsum('abcd,ijab,klcd->ijkl', VMO, tMO, tMO)
+	Cond = np.einsum('ijkl,ip,jq,kr,ls->pqrs', CondMO, TFragOcc, TFragOcc, TFragOcc, TFragOcc)
+	return Cond
+
+def TwoConditionsMP3OOOO(VMO_OOOO, tMO, TFragVir):
+	VMO = AntiSymV(VMO_OOOO)
+	CondMO = np.einsum('ijkl,ijab,klcd->abcd', VMO, tMO, tMO)
+	Cond = np.einsum('abcd,ap,bq,cr,ds->pqrs', CondMO, TFragVir, TFragVir, TFragVir, TFragVir)
+	return Cond
+
+def TwoConditionsMP3OOVV(VMO_OOVV, tMO, TFragOcc, TFragVir):
+	VMO = AntiSymV(VMO_OOVV)
+	CondMO = np.einsum('klcd,ikac,jlbd->ijab', VMO, tMO, tMO)
+	Cond = np.einsum('ijab,ip,jq,ar,bs->pqrs', CondMO, TFragOcc, TFragOcc, TFragVir, TFragVir)
+	return Cond
 
 def OneConditionsOO(VSO_OOVV, tSO, SIndices):
 	Cond = np.einsum('ikcd,jkcd->ij', VSO_OOVV, tSO)
@@ -293,6 +322,9 @@ def GetConditions(VEff, hEff, VMO, tMO, TFragOcc, TFragVir, FIndices):
 	VMO_VVVV = VMO[nOcc:, nOcc:, nOcc:, nOcc:]
 	VMO_OVOV = VMO[:nOcc, nOcc:, :nOcc, nOcc:]
 	VMO_OOOO = VMO[:nOcc, :nOcc, :nOcc, :nOcc]
+	VMO_OOOV = VMO[:nOcc, :nOcc, :nOcc, nOcc:]
+	VMO_OVVV = VMO[:nOcc, nOcc:, nOcc:, nOcc:]
+	VMO_OOVV = VMO[:nOcc, :nOcc, nOcc:, nOcc:]
 	
 	# These give the FF block of the conditions
 	CondOOVV = TwoConditionsOOVV(VMO_VVVV, tMO, TFragOcc, TFragVir)
@@ -303,8 +335,15 @@ def GetConditions(VEff, hEff, VMO, tMO, TFragOcc, TFragVir, FIndices):
 	CondOOOO2e = TwoConditionsOOOO2e(VMO_OOOO, tMO, TFragOcc, TFragVir)
 	CondOOOO1e = TwoConditionsOOOO1e(VMO_OOOO, tMO, TFragOcc, TFragVir)
 
+	CondOOOV2e = TwoConditionsOOOV2e(VMO_OOOV, tMO, TFragOcc, TFragVir)
+	CondOVVV2e = TwoConditionsOVVV2e(VMO_OVVV, tMO, TFragOcc, TFragVir)
+
+	CondMP3VVVV = TwoConditionsMP3VVVV(VMO_VVVV, tMO, TFragOcc)
+	CondMP3OOOO = TwoConditionsMP3OOOO(VMO_OOOO, tMO, TFragVir)
+	CondMP3OOVV = TwoConditionsMP3OOVV(VMO_OOVV, tMO, TFragOcc, TFragVir)
+
 	#return [CondOOVV, CondVVVV1e, CondOOOO2e, CondOOOO1e] 
-	return [CondOOVV, CondVVVV, CondOOOO2e]#, CondOOOO2e, CondOOOO1e]
+	return [CondOOVV, CondVVVV, CondOOOO2e, CondMP3VVVV, CondMP3OOOO, CondMP3OOVV]#, CondOOOO2e, CondOOOO1e]
 	#return [CondOOVV, CondOOOO, CondVVVV, CondOOVVMix, CondVVVV1e, CondOOOO2e, CondOOOO1e]
 
 def LossPacked(VEff, hEff, FIndices, Conds, gAndMO = None):
@@ -340,6 +379,10 @@ def LossPacked(VEff, hEff, FIndices, Conds, gAndMO = None):
 	VMOEff_VVVV = VMOEff[nOccEff:, nOccEff:, nOccEff:, nOccEff:]
 	VMOEff_OVOV = VMOEff[:nOccEff, nOccEff:, :nOccEff, nOccEff:]
 	VMOEff_OOOO = VMOEff[:nOccEff, :nOccEff, :nOccEff, :nOccEff]
+	VMOEff_OOOV = VMOEff[:nOccEff, :nOccEff, :nOccEff, nOccEff:]
+	VMOEff_OVVV = VMOEff[:nOccEff, nOccEff:, nOccEff:, nOccEff:]
+	VMOEff_OOVV = VMOEff[:nOccEff, :nOccEff, nOccEff:, nOccEff:]
+
 	UnknOOVV = TwoConditionsOOVV(VMOEff_VVVV, tEff, TFragEffOcc, TFragEffVir)
 	UnknOOOO = TwoConditionsOOOO(VMOEff_OVOV, tEff, TFragEffOcc)
 	UnknVVVV = TwoConditionsVVVV(VMOEff_OVOV, tEff, TFragEffVir)
@@ -348,11 +391,17 @@ def LossPacked(VEff, hEff, FIndices, Conds, gAndMO = None):
 	UnknOOOO2e = TwoConditionsOOOO2e(VMOEff_OOOO, tEff, TFragEffOcc, TFragEffVir)
 	UnknOOOO1e = TwoConditionsOOOO1e(VMOEff_OOOO, tEff, TFragEffOcc, TFragEffVir)
 
+	UnknOOOV2e = TwoConditionsOOOV2e(VMOEff_OOOV, tEff, TFragEffOcc, TFragEffVir)
+	UnknOVVV2e = TwoConditionsOVVV2e(VMOEff_OVVV, tEff, TFragEffOcc, TFragEffVir)
+
+	UnknMP3VVVV = TwoConditionsMP3VVVV(VMOEff_VVVV, tEff, TFragEffOcc)
+	UnknMP3OOOO = TwoConditionsMP3OOOO(VMOEff_OOOO, tEff, TFragEffVir)
+	UnknMP3OOVV = TwoConditionsMP3OOVV(VMOEff_OOVV, tEff, TFragEffOcc, TFragEffVir)
 
 	#print(Conds)
 	#print(UnknOOVV, UnknOOOO, UnknVVVV, UnknOOVVMix)
 	#Loss = [UnknOOVV - Conds[0], UnknVVVV1e - Conds[1], UnknOOOO2e - Conds[2], UnknOOOO1e - Conds[3]]
-	Loss = [UnknOOVV - Conds[0], UnknVVVV - Conds[1], UnknOOOO2e - Conds[2]]#, UnknOOOO2e - Conds[4], UnknOOOO1e - Conds[5]]
+	Loss = [UnknOOVV - Conds[0], UnknVVVV - Conds[1], UnknOOOO2e - Conds[2], UnknMP3VVVV - Conds[3], UnknMP3OOOO - Conds[4], UnknMP3OOVV - Conds[5]]#, UnknOOOO2e - Conds[4], UnknOOOO1e - Conds[5]]
 	#Loss = [UnknOOVV - Conds[0], UnknOOOO - Conds[1], UnknVVVV - Conds[2], UnknOOVVMix - Conds[3], UnknVVVV1e - Conds[4], UnknOOOO2e - Conds[5], UnknOOOO1e - Conds[6]]
 	return Loss
 	
@@ -444,7 +493,7 @@ def GaussNewton(f, x0, df, args, tol = 1e-12):
 		print((F**2.0).sum())
 		input()
 
-def LevenbergMarquardt(f, x0, df, args, tol = 1e-12, lamb = 1e-6):
+def LevenbergMarquardt(f, x0, df, args, tol = 1e-20, lamb = 1e-6):
 	F = f(x0, *args)
 	x = x0.copy()
 	while (F**2.0).sum() > tol:
@@ -509,23 +558,24 @@ def MP2MLEmbedding(hEff, VMO, tMO, TFragOcc, TFragVir, FIndices, VEff0 = None, g
 	#for i in range(steps):
 	#	L0 = Loss(np.asarray([scan_start + i * step_size, 0, 0, 0]), hEff, FIndices, BIndices, [VFFFF, VBBBB], Conds, gAndMO)
 	#	f.write("%f\t%f\t%f\t%f\t%f\t%f\t%f\t%f\n" % (scan_start + i * step_size, L0[0], L0[1], L0[2], L0[3], L0[4], L0[5], L0[6]))
+	#	f.write("%f\t%f\t%f\t%f\t%f\t%f\n" % (scan_start + i * step_size, L0[0], L0[1], L0[2], L0[3], L0[4]))
 	#	for j in range(steps):
 	#		for k in range(steps):
 	#			for l in range(steps):
 	#				L0 = Loss(np.asarray([scan_start + i * step_size, scan_start + j * step_size, scan_start + k * step_size, scan_start + l * step_size]), hEff, FIndices, BIndices, [VFFFF, VBBBB], Conds, gAndMO)
 	#				f.write("%f\t%f\t%f\t%f\t%f\t%f\t%f\t%f\n" % (scan_start + i * step_size, scan_start + j * step_size, scan_start + k * step_size, scan_start + l * step_size, L0[0], L0[1], L0[2], L0[3]))
-	L1 = Loss(np.asarray([1., 0., 0., 0.]), hEff, FIndices, BIndices, [VFFFF, VBBBB], Conds, gAndMO)
-	L2 = Loss(np.asarray([0., 1., 0., 0.]), hEff, FIndices, BIndices, [VFFFF, VBBBB], Conds, gAndMO)
-	L3 = Loss(np.asarray([0., 0., 1., 0.]), hEff, FIndices, BIndices, [VFFFF, VBBBB], Conds, gAndMO)
-	L4 = Loss(np.asarray([0., 0., 0., 1.]), hEff, FIndices, BIndices, [VFFFF, VBBBB], Conds, gAndMO)
-	print(L1)
-	print(L2)
-	print(L3)
-	print(L4)
-	#VEffVec = np.zeros(VEffVec.shape)
+	#L1 = Loss(np.asarray([1., 0., 0., 0.]), hEff, FIndices, BIndices, [VFFFF, VBBBB], Conds, gAndMO)
+	#L2 = Loss(np.asarray([0., 1., 0., 0.]), hEff, FIndices, BIndices, [VFFFF, VBBBB], Conds, gAndMO)
+	#L3 = Loss(np.asarray([0., 0., 1., 0.]), hEff, FIndices, BIndices, [VFFFF, VBBBB], Conds, gAndMO)
+	#L4 = Loss(np.asarray([0., 0., 0., 1.]), hEff, FIndices, BIndices, [VFFFF, VBBBB], Conds, gAndMO)
+	#print(L1)
+	#print(L2)
+	#print(L3)
+	#print(L4)
+	VEffVec = np.zeros(VEffVec.shape)
 	#VEffFinal = NewtonRaphson(Loss, VEffVec, dLoss, [hEff, FIndices, BIndices, [VFFFF, VBBBB], Conds, gAndMO])
 	#VEffFinal = GaussNewton(Loss, VEffVec, dLoss, [hEff, FIndices, BIndices, [VFFFF, VBBBB], Conds, gAndMO])
-	VEffVecFinal = LevenbergMarquardt(Loss, VEffVec, dLoss, [hEff, FIndices, BIndices, [VFFFF, VBBBB], Conds, gAndMO], tol = 1e-20, lamb = 1e-10)
+	VEffVecFinal = LevenbergMarquardt(Loss, VEffVec, dLoss, [hEff, FIndices, BIndices, [VFFFF, VBBBB], Conds, gAndMO], tol = 1e-30, lamb = 1e-10)
 	VEffFinal = VectorToVSymm(VEffVecFinal, FIndices, BIndices)
 	VEffFinal[np.ix_(FIndices, FIndices, FIndices, FIndices)] = VFFFF
 	VEffFinal[np.ix_(BIndices, BIndices, BIndices, BIndices)] = VBBBB
@@ -650,9 +700,9 @@ if __name__ == '__main__':
 	#tMO_Occ = np.zeros((Norb, Norb, Norb, Norb))
 	#tMO_Vir = np.zeros((Norb, Norb, Norb, Norb))
 
-	#VML = MP2MLEmbedding(hFrag, VMO, t2, TFragOccMOtoSO, TFragVirMOtoSO, FIndices, VEff0 = VFrag, gFixed = True)
+	VML = MP2MLEmbedding(hFrag, VMO, t2, TFragOccMOtoSO, TFragVirMOtoSO, FIndices, VEff0 = VFrag, gFixed = True)
 
-	FragE = FragmentRMP2(hNoCore, hFrag, VFrag, FIndices)
+	FragE = FragmentRMP2(hNoCore, hFrag, VML, FIndices)
 	print(int(N / Nf) * FragE + mol.energy_nuc())
 	print(int(N / Nf) * FragE)
 	#tZero = np.zeros((Norb, Norb, Norb, Norb))
