@@ -277,13 +277,13 @@ def TwoConditionsOVVV2e(VMO_OVVV, tMO, TFragOcc, TFragVir):
 
 def TwoConditionsMP3VVVV(VMO_VVVV, tMO, TFragOcc):
 	VMO = AntiSymV(VMO_VVVV)
-	CondMO = np.einsum('abcd,ijab,klcd->ijkl', VMO, tMO, tMO)
+	CondMO = np.einsum('acbd,ijab,klcd->ijkl', VMO, tMO, tMO)
 	Cond = np.einsum('ijkl,ip,jq,kr,ls->pqrs', CondMO, TFragOcc, TFragOcc, TFragOcc, TFragOcc)
 	return Cond
 
 def TwoConditionsMP3OOOO(VMO_OOOO, tMO, TFragVir):
 	VMO = AntiSymV(VMO_OOOO)
-	CondMO = np.einsum('ijkl,ijab,klcd->abcd', VMO, tMO, tMO)
+	CondMO = np.einsum('ikjl,ijab,klcd->abcd', VMO, tMO, tMO)
 	Cond = np.einsum('abcd,ap,bq,cr,ds->pqrs', CondMO, TFragVir, TFragVir, TFragVir, TFragVir)
 	return Cond
 
@@ -550,15 +550,15 @@ def MP2MLEmbedding(hEff, VMO, tMO, TFragOcc, TFragVir, FIndices, VEff0 = None, g
 		gAndMO = None
 
 	#VEffVec = np.random.rand(VEffVec.shape[0],)
-	#scan_start = -2.
-	#scan_end = 2.
-	#step_size = 0.25
-	#steps = int((scan_end - scan_start)/step_size) + 1
-	#f = open('scan.txt', 'w')
-	#for i in range(steps):
-	#	L0 = Loss(np.asarray([scan_start + i * step_size, 0, 0, 0]), hEff, FIndices, BIndices, [VFFFF, VBBBB], Conds, gAndMO)
+	scan_start = -2.
+	scan_end = 2.
+	step_size = 0.25
+	steps = int((scan_end - scan_start)/step_size) + 1
+	f = open('scan.txt', 'w')
+	for i in range(steps):
+		L0 = Loss(np.asarray([0, 0, 0, scan_start + i * step_size]), hEff, FIndices, BIndices, [VFFFF, VBBBB], Conds, gAndMO)
 	#	f.write("%f\t%f\t%f\t%f\t%f\t%f\t%f\t%f\n" % (scan_start + i * step_size, L0[0], L0[1], L0[2], L0[3], L0[4], L0[5], L0[6]))
-	#	f.write("%f\t%f\t%f\t%f\t%f\t%f\n" % (scan_start + i * step_size, L0[0], L0[1], L0[2], L0[3], L0[4]))
+		f.write("%f\t%f\t%f\t%f\t%f\t%f\t%f\n" % (scan_start + i * step_size, L0[0], L0[1], L0[2], L0[3], L0[4], L0[5]))
 	#	for j in range(steps):
 	#		for k in range(steps):
 	#			for l in range(steps):
@@ -581,6 +581,60 @@ def MP2MLEmbedding(hEff, VMO, tMO, TFragOcc, TFragVir, FIndices, VEff0 = None, g
 	VEffFinal[np.ix_(BIndices, BIndices, BIndices, BIndices)] = VBBBB
 	#VEffFinal = newton(Loss, VEffVec, args = [hEff, FIndices, BIndices, [VFFFF, VBBBB], Conds, gAndMO], fprime = dLoss, maxiter = 50)
 	return VEffFinal
+
+def MP2EnergyEmbedding(hNoCore, hEff, FIndices, ETarget, VEff0 = None):
+	N = 2 * int(len(FIndices))
+	nFrag = len(FIndices)
+	BIndices = [i + nFrag for i in FIndices]
+	if VEff0 is None:
+		VEffVec = np.zeros(4 * nFrag**4)
+		VFFFF = np.zeros((nFrag, nFrag, nFrag, nFrag))
+		VBBBB = np.zeros((nFrag, nFrag, nFrag, nFrag))
+	else:
+		VFFFF = VEff0[np.ix_(FIndices, FIndices, FIndices, FIndices)]
+		VBBBB = VEff0[np.ix_(BIndices, BIndices, BIndices, BIndices)]
+
+		VBFFF = VEff0[np.ix_(BIndices, FIndices, FIndices, FIndices)]
+		VFBFB = VEff0[np.ix_(FIndices, BIndices, FIndices, BIndices)]
+		VFFBB = VEff0[np.ix_(FIndices, FIndices, BIndices, BIndices)]
+		VFBBB = VEff0[np.ix_(FIndices, BIndices, BIndices, BIndices)]
+		VBFFFVec = ERIToVector(VBFFF)
+		VFBFBVec = ERIToVector(VFBFB)
+		VFFBBVec = ERIToVector(VFFBB)
+		VFBBBVec = ERIToVector(VFBBB)
+		VEffVec = VFFBBVec
+	print(VEffVec)
+	# Get Conditions which are fixed.
+	Conds = np.asarray([ETarget])
+	print("ETarget", ETarget)
+
+	# Energy derivative wrt VFFBB
+	def dEMP2(VFFBB, hNoCore, h, V, CenterIndices):
+		dV = 0.01
+		VFFBBPlus = VFFBB + dV
+		VFFBBMins = VFFBB - dV
+		VPlus = V.copy()
+		VMins = V.copy()
+		VPlus[np.ix_(FIndices, FIndices, BIndices, BIndices)] = VFFBBPlus
+		VMins[np.ix_(FIndices, FIndices, BIndices, BIndices)] = VFFBBMins
+		EPlus = FragmentRMP2(hNoCore, h, VPlus, CenterIndices)
+		EMins = FragmentRMP2(hNoCore, h, VMins, CenterIndices)
+		dE = (EPlus - EMins) / (2.0 * dV)
+		J = np.zeros((1,1))
+		J[0, 0] = dE
+		return J
+	def ELoss(VFFBB, hNoCore, h, V, CenterIndices):
+		VLocal = V.copy()
+		VLocal[np.ix_(FIndices, FIndices, BIndices, BIndices)] = VFFBB
+		E = FragmentRMP2(hNoCore, h, VLocal, CenterIndices)
+		print("EFrag", E)
+		return np.asarray([E]) - Conds
+	# Do RHF to get a fixed g, if desired.
+
+	VEffVecFinal = LevenbergMarquardt(ELoss, VEffVec, dEMP2, [hNoCore, hEff, VEff0, FIndices], tol = 1e-30, lamb = 1e-10)
+	print(VEffVecFinal)
+	return VEffVecFinal
+
 
 def CombinedIndex(Indices, nFB):
 	if len(Indices) == 2:
@@ -676,6 +730,7 @@ if __name__ == '__main__':
 	mp2 = mp.MP2(mf)
 	E, T2 = mp2.kernel()
 	print("E_elec(MP2) =", mf.e_tot + E - mf.energy_nuc())
+	EMP2 = mf.e_tot + E - mf.energy_nuc()	
 
 	Nocc = T2.shape[0]
 	Nvir = T2.shape[2]
@@ -700,15 +755,12 @@ if __name__ == '__main__':
 	#tMO_Occ = np.zeros((Norb, Norb, Norb, Norb))
 	#tMO_Vir = np.zeros((Norb, Norb, Norb, Norb))
 
+	#MP2EnergyEmbedding(hNoCore, hFrag, FIndices, EMP2 / N, VEff0 = VFrag)
 	VML = MP2MLEmbedding(hFrag, VMO, t2, TFragOccMOtoSO, TFragVirMOtoSO, FIndices, VEff0 = VFrag, gFixed = True)
 
 	FragE = FragmentRMP2(hNoCore, hFrag, VML, FIndices)
-	print(int(N / Nf) * FragE + mol.energy_nuc())
-	print(int(N / Nf) * FragE)
-	#tZero = np.zeros((Norb, Norb, Norb, Norb))
-	#testMFBath = MP2Bath(tZero, FIndex, BIndex, EIndex, PSch, PEnv, hSO, VSO)
-	#mf0, mf1, mf2 = testMFBath.CalcH()
-	#mf0.tofile("mf0")
-	#mf1.tofile("mf1")
-	#mf2.tofile("mf2")
+	print(FragE*N)
+	print(EMP2)
+	#print(int(N / Nf) * FragE + mol.energy_nuc())
+	#print(int(N / Nf) * FragE)
 	
