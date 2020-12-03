@@ -343,7 +343,8 @@ def GetConditions(VEff, hEff, VMO, tMO, TFragOcc, TFragVir, FIndices):
 	CondMP3OOVV = TwoConditionsMP3OOVV(VMO_OOVV, tMO, TFragOcc, TFragVir)
 
 	#return [CondOOVV, CondVVVV1e, CondOOOO2e, CondOOOO1e] 
-	return [CondOOVV, CondVVVV, CondOOOO2e, CondMP3VVVV, CondMP3OOOO, CondMP3OOVV]#, CondOOOO2e, CondOOOO1e]
+	#return [CondOOVV, CondVVVV, CondOOOO2e, CondMP3OOVV]#, CondMP3OOOO, CondMP3OOVV]#, CondOOOO2e, CondOOOO1e]
+	return [CondMP3VVVV, CondMP3OOOO, CondMP3OOVV, CondOOOO2e]
 	#return [CondOOVV, CondOOOO, CondVVVV, CondOOVVMix, CondVVVV1e, CondOOOO2e, CondOOOO1e]
 
 def LossPacked(VEff, hEff, FIndices, Conds, gAndMO = None):
@@ -401,7 +402,8 @@ def LossPacked(VEff, hEff, FIndices, Conds, gAndMO = None):
 	#print(Conds)
 	#print(UnknOOVV, UnknOOOO, UnknVVVV, UnknOOVVMix)
 	#Loss = [UnknOOVV - Conds[0], UnknVVVV1e - Conds[1], UnknOOOO2e - Conds[2], UnknOOOO1e - Conds[3]]
-	Loss = [UnknOOVV - Conds[0], UnknVVVV - Conds[1], UnknOOOO2e - Conds[2], UnknMP3VVVV - Conds[3], UnknMP3OOOO - Conds[4], UnknMP3OOVV - Conds[5]]#, UnknOOOO2e - Conds[4], UnknOOOO1e - Conds[5]]
+	#Loss = [UnknOOVV - Conds[0], UnknVVVV - Conds[1], UnknOOOO2e - Conds[2], UnknMP3OOVV - Conds[3]]# UnknMP3OOOO - Conds[4], UnknMP3OOVV - Conds[5]]#, UnknOOOO2e - Conds[4], UnknOOOO1e - Conds[5]]
+	Loss = [UnknMP3VVVV - Conds[0], UnknMP3OOOO - Conds[1], UnknMP3OOVV - Conds[2], UnknOOOO2e - Conds[3]]
 	#Loss = [UnknOOVV - Conds[0], UnknOOOO - Conds[1], UnknVVVV - Conds[2], UnknOOVVMix - Conds[3], UnknVVVV1e - Conds[4], UnknOOOO2e - Conds[5], UnknOOOO1e - Conds[6]]
 	return Loss
 	
@@ -550,15 +552,15 @@ def MP2MLEmbedding(hEff, VMO, tMO, TFragOcc, TFragVir, FIndices, VEff0 = None, g
 		gAndMO = None
 
 	#VEffVec = np.random.rand(VEffVec.shape[0],)
-	scan_start = -2.
-	scan_end = 2.
-	step_size = 0.25
-	steps = int((scan_end - scan_start)/step_size) + 1
-	f = open('scan.txt', 'w')
-	for i in range(steps):
-		L0 = Loss(np.asarray([0, 0, 0, scan_start + i * step_size]), hEff, FIndices, BIndices, [VFFFF, VBBBB], Conds, gAndMO)
+	#scan_start = -2.
+	#scan_end = 2.
+	#step_size = 0.25
+	#steps = int((scan_end - scan_start)/step_size) + 1
+	#f = open('scan.txt', 'w')
+	#for i in range(steps):
+	#	L0 = Loss(np.asarray([0, 0, 0, scan_start + i * step_size]), hEff, FIndices, BIndices, [VFFFF, VBBBB], Conds, gAndMO)
 	#	f.write("%f\t%f\t%f\t%f\t%f\t%f\t%f\t%f\n" % (scan_start + i * step_size, L0[0], L0[1], L0[2], L0[3], L0[4], L0[5], L0[6]))
-		f.write("%f\t%f\t%f\t%f\t%f\t%f\t%f\n" % (scan_start + i * step_size, L0[0], L0[1], L0[2], L0[3], L0[4], L0[5]))
+	#	f.write("%f\t%f\t%f\t%f\t%f\t%f\t%f\n" % (scan_start + i * step_size, L0[0], L0[1], L0[2], L0[3], L0[4], L0[5]))
 	#	for j in range(steps):
 	#		for k in range(steps):
 	#			for l in range(steps):
@@ -572,7 +574,7 @@ def MP2MLEmbedding(hEff, VMO, tMO, TFragOcc, TFragVir, FIndices, VEff0 = None, g
 	#print(L2)
 	#print(L3)
 	#print(L4)
-	VEffVec = np.zeros(VEffVec.shape)
+	#VEffVec = np.zeros(VEffVec.shape)
 	#VEffFinal = NewtonRaphson(Loss, VEffVec, dLoss, [hEff, FIndices, BIndices, [VFFFF, VBBBB], Conds, gAndMO])
 	#VEffFinal = GaussNewton(Loss, VEffVec, dLoss, [hEff, FIndices, BIndices, [VFFFF, VBBBB], Conds, gAndMO])
 	VEffVecFinal = LevenbergMarquardt(Loss, VEffVec, dLoss, [hEff, FIndices, BIndices, [VFFFF, VBBBB], Conds, gAndMO], tol = 1e-30, lamb = 1e-10)
