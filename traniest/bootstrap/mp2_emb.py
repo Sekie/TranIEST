@@ -57,28 +57,25 @@ def ReshapeTwo(V):
 def TwoExternal(V, VbbAA = None, ReturnFull = False):
 	OrigDim = V.shape
 	nF = OrigDim[0]
-	VExtended = V.reshape(V.shape[0] * V.shape[1], V.shape[2] * V.shape[3])
-	print(VExtended)
+	VExtended = ReshapeTwo(V) #V.reshape(V.shape[0] * V.shape[1], V.shape[2] * V.shape[3])
 	U, S, T = np.linalg.svd(VExtended)
 	VExtended = VExtended @ T.T
 	if ReturnFull:
-		return VExtended.reshape(OrigDim)
-	VExtended = VExtended[:, :(nF * nF)]
-	#print(VExtended.reshape(nF, nF, nF, nF))
-	if ReturnFull:
-		return VExtended.reshape(OrigDim)
+		return ReshapeTwo(VExtended) #VExtended.reshape(OrigDim)
+	VExtended = VExtended[:, :(S.shape[0])] #[:, :(nF * nF)]
+	#print(ReshapeTwo(VExtended))
 	if VbbAA is not None:
-		Idx = list(range(nF)) + list(range(V.shape[2], V.shape[2] + nF))
-		TCut = T[Idx, :]
-		VBathExtended = VbbAA.reshape(VbbAA.shape[0] * VbbAA.shape[1], VbbAA.shape[2] * VbbAA.shape[3])
+		#Idx = list(range(nF)) + list(range(V.shape[2], V.shape[2] + nF))
+		TCut = T[:(S.shape[0]), :] #T[Idx, :]
+		VBathExtended = ReshapeTwo(VbbAA) #VbbAA.reshape(VbbAA.shape[0] * VbbAA.shape[1], VbbAA.shape[2] * VbbAA.shape[3])
 		VBathExtended = VBathExtended @ TCut.T
 		#print(VBathExtended)
 		UB, SB, TB = np.linalg.svd(VBathExtended)
 		VBathExtended = VBathExtended @ TB.T
 		#print(VBathExtended)
 		VExtended = VExtended @ TB.T
-		return VExtended.reshape(nF, nF, nF, nF)
-	return VExtended.reshape(nF, nF, nF, nF)
+		return ReshapeTwo(VExtended) #VExtended.reshape(nF, nF, nF, nF)
+	return ReshapeTwo(VExtended) #VExtended.reshape(nF, nF, nF, nF)
 
 def ThreeExternal(V, ReturnFull = False):
 	OrigDim = V.shape
