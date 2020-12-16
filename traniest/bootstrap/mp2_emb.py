@@ -1,35 +1,95 @@
 import numpy as np
 from scipy.optimize import newton
+import math
 
 def CheckSymmetry(V):
 	Symmetric = True
 	
 # Assumes V is given as VFFFA in chemist notation
-def OneExternal(V):
+def OneExternal(V, ReturnFull = False):
 	nF = V.shape[0]
 	B = V.copy()
 	for i in range(nF):
 		for j in range(nF):
 			U, S, T = np.linalg.svd(V[i, j])
-			print(S)
 			B[i, j] = V[i, j] @ T.T
-	return B
+			#print(i, j, "\n", B[i, j])
+	if ReturnFull:
+		return B, T
+	return B[:, :, :, :nF], T
 
-def TwoExternal(V):
+def ReshapeTwo(V):
+	if len(V.shape) == 4:
+		nA = V.shape[0]
+		nB = V.shape[2]
+		VExtended = V.reshape(V.shape[0] * V.shape[1], V.shape[2] * V.shape[3])
+		VCondense = np.zeros((int(nA * (nA + 1) / 2), int(nB * (nB + 1) / 2)))
+		ij = -1
+		for i in range(nA):
+			for j in range(i, nA):
+				ij += 1
+				kl = -1
+				for k in range(nB):
+					for l in range(k, nB):
+						kl += 1
+						VCondense[ij, kl] = V[i, j, k, l]
+		return VCondense
+	else:
+		UA = V.shape[0]
+		UB = V.shape[1]
+		nA = int((-1 + math.sqrt(1 + 8 * UA)) / 2.0)
+		nB = int((-1 + math.sqrt(1 + 8 * UB)) / 2.0)
+		VExpand = np.zeros((nA, nA, nB, nB))
+		ij = -1
+		for i in range(nA):
+			for j in range(i, nA):
+				ij += 1
+				kl = -1
+				for k in range(nB):
+					for l in range(k, nB):
+						kl += 1
+						VExpand[i, j, k, l] = V[ij, kl]
+						VExpand[j, i, k, l] = V[ij, kl]
+						VExpand[i, j, l, k] = V[ij, kl]
+						VExpand[j, i, l, k] = V[ij, kl]
+		return VExpand
+
+def TwoExternal(V, VbbAA = None, ReturnFull = False):
 	OrigDim = V.shape
-	print(V[0,0])
+	nF = OrigDim[0]
 	VExtended = V.reshape(V.shape[0] * V.shape[1], V.shape[2] * V.shape[3])
-	print(VExtended[0].reshape(V.shape[2], V.shape[3]))
+	print(VExtended)
 	U, S, T = np.linalg.svd(VExtended)
 	VExtended = VExtended @ T.T
-	return VExtended.reshape(OrigDim)
+	if ReturnFull:
+		return VExtended.reshape(OrigDim)
+	VExtended = VExtended[:, :(nF * nF)]
+	#print(VExtended.reshape(nF, nF, nF, nF))
+	if ReturnFull:
+		return VExtended.reshape(OrigDim)
+	if VbbAA is not None:
+		Idx = list(range(nF)) + list(range(V.shape[2], V.shape[2] + nF))
+		TCut = T[Idx, :]
+		VBathExtended = VbbAA.reshape(VbbAA.shape[0] * VbbAA.shape[1], VbbAA.shape[2] * VbbAA.shape[3])
+		VBathExtended = VBathExtended @ TCut.T
+		#print(VBathExtended)
+		UB, SB, TB = np.linalg.svd(VBathExtended)
+		VBathExtended = VBathExtended @ TB.T
+		#print(VBathExtended)
+		VExtended = VExtended @ TB.T
+		return VExtended.reshape(nF, nF, nF, nF)
+	return VExtended.reshape(nF, nF, nF, nF)
 
-def ThreeExternal(V):
+def ThreeExternal(V, ReturnFull = False):
 	OrigDim = V.shape
+	nF = OrigDim[0]
 	VExtended = V.reshape(V.shape[0], V.shape[1] * V.shape[2] * V.shape[3])
 	U, S, T = np.linalg.svd(VExtended)
 	VExtended = VExtended @ T.T
-	return VExtended.reshape(OrigDim)
+	Idx = list(range(nF))
+	if ReturnFull:
+		return VExtended.reshape(OrigDim)
+	return VExtended.reshape(OrigDim)[np.ix_(Idx, Idx, Idx, Idx)]
 
 if __name__ == '__main__':
 	from functools import reduce
@@ -136,25 +196,20 @@ if __name__ == '__main__':
 
 	RDM2 = mp2.make_rdm2()
 
-	VOneExt = VLO[np.ix_(FIndices, FIndices, FIndices, BEIndices)] #VLO[FIndices, :, :, :][:, FIndices, :, :][:, :, FIndices, :][:, :, :, :]
-	print(VOneExt[0,0])
-	print(VOneExt.shape)
-	print(VOneExt)
-	VV = OneExternal(VOneExt)
-	print(VV[0, 0, 1, 1])
-	print(VV[1, 1, 0, 0])
-	print(VV[0, 1, 0, 1])
-	print(VV[0, 1, 1, 0])
-	print(VV[1, 0, 0, 1])
-	VTwoExt = VLO[FIndices, :, :, :][:, FIndices, :, :][:, :, BEIndices, :][:, :, :, BEIndices]
-	V2 = TwoExternal(VTwoExt)
-	print(V2[:, :,  0, 0])
-	print(V2[0, 0])
-	print(V2[0, 1, 0, 1])
-	print(V2[0, 1, 1, 0])
-	VThreeExt = VLO[FIndices, :, :, :][:, :, :, :][:, :, :, :][:, :, :, :]
-	V3 = ThreeExternal(VThreeExt)
-	print(V3[0, 0, 1, 1])
-	print(V3[1, 1, 0, 0])
-	print(V3[0, 1, 0, 1])
-	print(V3[0, 1, 1, 0])
+	VFFFA = VLO[np.ix_(FIndices, FIndices, FIndices, BEIndices)] #VLO[FIndices, :, :, :][:, FIndices, :, :][:, :, FIndices, :][:, :, :, :]
+	VFFFB, TOneIdx = OneExternal(VFFFA)
+	VFFAA = VLO[np.ix_(FIndices, FIndices, BEIndices, BEIndices)]#[FIndices, :, :, :][:, FIndices, :, :][:, :, BEIndices, :][:, :, :, BEIndices]
+	VbbAA = np.einsum('ijkl,ip,jq->pqkl', VLO, TBath, TBath)
+	VbbAA = VbbAA[np.ix_(list(range(Nf)), list(range(Nf)), BEIndices, BEIndices)]
+	VFFBB = TwoExternal(VFFAA, VbbAA = VbbAA)
+	print(VFFBB)
+	VFAFA = VLO[np.ix_(FIndices, BEIndices, FIndices, BEIndices)]
+	VbAbA = np.einsum('ijkl,ip,kq->pjql', VLO, TBath, TBath)
+	VbAbA = VbAbA[np.ix_(list(range(Nf)), BEIndices, list(range(Nf)), BEIndices)]
+	VFAFA_Phys = np.swapaxes(VFAFA, 1, 2)
+	VbAbA_Phys = np.swapaxes(VbAbA, 1, 2)
+	VFBFB_Phys = TwoExternal(VFAFA_Phys, VbbAA = VbAbA_Phys)
+	VFBFB = np.swapaxes(VFBFB_Phys, 1, 2)
+	print(VFBFB)
+	VFAAA = VLO[FIndices, :, :, :][:, :, :, :][:, :, :, :][:, :, :, :]
+	VFBBB = ThreeExternal(VFAAA)
