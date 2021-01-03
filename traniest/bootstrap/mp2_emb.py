@@ -83,6 +83,8 @@ def ThreeExternal(V, ReturnFull = False):
 	VExtended = V.reshape(V.shape[0], V.shape[1] * V.shape[2] * V.shape[3])
 	U, S, T = np.linalg.svd(VExtended)
 	VExtended = VExtended @ T.T
+	print("hi")
+	print(VExtended[:, :nF])
 	Idx = list(range(nF))
 	if ReturnFull:
 		return VExtended.reshape(OrigDim)
