@@ -2,8 +2,33 @@ import numpy as np
 from scipy.optimize import newton
 import math
 
-def CheckSymmetry(V):
-	Symmetric = True
+def CheckSymmetry(ERI):
+	def CheckCong(V):
+		n = V.shape[0]
+		for i in range(n):
+			for j in range(n):
+				V1 = V[i, j]
+				V2 = V1.T
+				T1 = np.isclose(V1, V2).all()
+				V1 = V[j, i]
+				T2 = np.isclose(V1, V2).all()
+
+				V1 = V[:, :, i, j]
+				V2 = V1.T
+				T3 = np.isclose(V1, V2).all()
+				V1 = V[:, :, j, i]
+				T4 = np.isclose(V1, V2).all()
+				if not T1 or not T2 or not T3 or not T4:
+					return False
+		return True
+	Sym = CheckCong(ERI)
+	if not Sym:
+		return Sym
+	ERI2 = np.swapaxes(ERI, 0, 2)
+	ERI2 = np.swapaxes(ERI2, 1, 3)
+	Sym = CheckCong(ERI2)
+	return Sym
+
 
 def CompileFullV(VFFFF, VFFFB, VFFBB, VFBFB, VFBBB, VBBBB):
 	nF = VFFFF.shape[0]
@@ -269,3 +294,5 @@ if __name__ == '__main__':
 
 	VTest = CompileFullV(VFFFF, VFFFB, VFFBB, VFBFB, VFBBB, VBBBB)
 	print(VTest)	
+	T = CheckSymmetry(VTest)
+	print(T)
