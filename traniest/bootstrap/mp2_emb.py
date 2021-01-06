@@ -5,7 +5,43 @@ import math
 def CheckSymmetry(V):
 	Symmetric = True
 
-def CompileFullV(VFFFB, VFFBB, VFBFB, VFBBB):
+def CompileFullV(VFFFF, VFFFB, VFFBB, VFBFB, VFBBB, VBBBB):
+	nF = VFFFF.shape[0]
+	V = np.zeros((2 * nF, 2 * nF, 2 * nF, 2 * nF))
+	Fs = list(range(nF))
+	Bs = list(range(nF, 2 * nF))
+	
+	V[np.ix_(Fs, Fs, Fs, Fs)] = VFFFF
+
+	V[np.ix_(Fs, Fs, Fs, Bs)] = VFFFB
+	V[np.ix_(Fs, Fs, Bs, Fs)] = np.swapaxes(VFFFB, 2, 3)
+	VFBFF = np.swapaxes(VFFFB, 1, 3)
+	VFBFF = np.swapaxes(VFBFF, 0, 2)
+	V[np.ix_(Fs, Bs, Fs, Fs)] = VFBFF
+	V[np.ix_(Bs, Fs, Fs, Fs)] = np.swapaxes(VFBFF, 0, 1)
+
+	V[np.ix_(Fs, Fs, Bs, Bs)] = VFFBB
+	VBBFF = np.swapaxes(VFFBB, 0, 2)
+	VBBFF = np.swapaxes(VBBFF, 1, 3)
+	V[np.ix_(Bs, Bs, Fs, Fs)] = VBBFF
+
+	V[np.ix_(Fs, Bs, Fs, Bs)] = VFBFB
+	V[np.ix_(Bs, Fs, Fs, Bs)] = np.swapaxes(VFBFB, 0, 1)
+	V[np.ix_(Fs, Bs, Bs, Fs)] = np.swapaxes(VFBFB, 2, 3)
+	VBFBF = np.swapaxes(VFBFB, 0, 1)
+	VBFBF = np.swapaxes(VBFBF, 2, 3)
+	V[np.ix_(Bs, Fs, Bs, Fs)] = VBFBF
+
+	V[np.ix_(Fs, Bs, Bs, Bs)] = VFBBB
+	V[np.ix_(Bs, Fs, Bs, Bs)] = np.swapaxes(VFBBB, 0, 1)
+	VBBFB = np.swapaxes(VFBBB, 0, 2)
+	VBBFB = np.swapaxes(VBBFB, 1, 3)
+	V[np.ix_(Bs, Bs, Fs, Bs)] = VBBFB
+	V[np.ix_(Bs, Bs, Bs, Fs)] = np.swapaxes(VBBFB, 2, 3)
+
+	V[np.ix_(Bs, Bs, Bs, Bs)] = VBBBB
+
+	return V
 
 	
 # Assumes V is given as VFFFA in chemist notation
@@ -227,3 +263,9 @@ if __name__ == '__main__':
 	VFAAA = VLO[np.ix_(FIndices, BEIndices, BEIndices, BEIndices)]
 	VFBBB = ThreeExternal(VFAAA)
 	print(VFBBB)
+
+	VFFFF = VLO[np.ix_(FIndices, FIndices, FIndices, FIndices)]
+	VBBBB = VLO[np.ix_(BIndices, BIndices, BIndices, BIndices)]
+
+	VTest = CompileFullV(VFFFF, VFFFB, VFFBB, VFBFB, VFBBB, VBBBB)
+	print(VTest)	
