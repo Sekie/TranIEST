@@ -4,6 +4,9 @@ import math
 
 def CheckSymmetry(V):
 	Symmetric = True
+
+def CompileFullV(VFFFB, VFFBB, VFBFB, VFBBB):
+
 	
 # Assumes V is given as VFFFA in chemist notation
 def OneExternal(V, ReturnFull = False):
@@ -77,18 +80,29 @@ def TwoExternal(V, VbbAA = None, ReturnFull = False):
 		return ReshapeTwo(VExtended) #VExtended.reshape(nF, nF, nF, nF)
 	return ReshapeTwo(VExtended) #VExtended.reshape(nF, nF, nF, nF)
 
-def ThreeExternal(V, ReturnFull = False):
-	OrigDim = V.shape
-	nF = OrigDim[0]
-	VExtended = V.reshape(V.shape[0], V.shape[1] * V.shape[2] * V.shape[3])
-	U, S, T = np.linalg.svd(VExtended)
-	VExtended = VExtended @ T.T
-	print("hi")
-	print(VExtended[:, :nF])
-	Idx = list(range(nF))
-	if ReturnFull:
-		return VExtended.reshape(OrigDim)
-	return VExtended.reshape(OrigDim)[np.ix_(Idx, Idx, Idx, Idx)]
+#def ThreeExternal(V, ReturnFull = False):
+#	OrigDim = V.shape
+#	nF = OrigDim[0]
+#	VExtended = V.reshape(V.shape[0], V.shape[1] * V.shape[2] * V.shape[3])
+#	U, S, T = np.linalg.svd(VExtended)
+#	VExtended = VExtended @ T.T
+#	print(VExtended[:, :nF])
+#	Idx = list(range(nF))
+#	if ReturnFull:
+#		return VExtended.reshape(OrigDim)
+#	return VExtended.reshape(OrigDim)[np.ix_(Idx, Idx, Idx, Idx)]
+
+def ThreeExternal(V):
+	VFABB = TwoExternal(V)
+	print(VFABB[0,0])
+	VBBFA = np.swapaxes(VFABB, 0, 2)
+	VBBFA = np.swapaxes(VBBFA, 1, 3)
+	print(VBBFA[:, :, 0, 0])
+	VBBFB = OneExternal(VBBFA)[0]
+	print(VBBFB)
+	VFBBB = np.swapaxes(VBBFB, 0, 2)
+	VFBBB = np.swapaxes(VFBBB, 1, 3)
+	return VFBBB
 
 if __name__ == '__main__':
 	from functools import reduce
@@ -210,5 +224,6 @@ if __name__ == '__main__':
 	VFBFB_Phys = TwoExternal(VFAFA_Phys, VbbAA = VbAbA_Phys)
 	VFBFB = np.swapaxes(VFBFB_Phys, 1, 2)
 	print(VFBFB)
-	VFAAA = VLO[FIndices, :, :, :][:, :, :, :][:, :, :, :][:, :, :, :]
+	VFAAA = VLO[np.ix_(FIndices, BEIndices, BEIndices, BEIndices)]
 	VFBBB = ThreeExternal(VFAAA)
+	print(VFBBB)
