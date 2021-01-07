@@ -29,6 +29,48 @@ def CheckSymmetry(ERI):
 	Sym = CheckCong(ERI2)
 	return Sym
 
+def FragmentRMP2(h, hcore, V, CenterIndices, S = None):
+	if S is None:
+		S = np.eye(h.shape[0])
+	mol = gto.M()
+	n = h.shape[0]
+	mol.nelectron = n
+
+	mf = scf.RHF(mol)
+	mf.get_hcore = lambda *args: hcore
+	mf.get_ovlp = lambda *args: S
+	mf._eri = ao2mo.restore(8, V, n)
+	mf.max_cycle = 1000
+
+	mf.kernel()
+	C = mf.mo_coeff
+	
+	mp2 = mp.MP2(mf)
+	E, T2 = mp2.kernel()
+	P = mp2.make_rdm1()
+	P = C @ P @ C.T
+	G = mp2.make_rdm2()
+	G = np.einsum('ijkl,ip,jq,kr,ls->pqrs', G, C, C, C, C)
+	FragE = CalcFragEnergy(h, hcore, V, P, G, CenterIndices)
+	return FragE
+
+def CompileFullh(hFF, hFB, hBB, Index = None):
+	nF = hFF.shape[0]
+	h = np.zeros((2 * nF, 2 * nF))
+
+	if Index is None:
+		Fs = list(range(nF))
+		Bs = list(range(nF, 2 * nF))
+	else:
+		Fs = Index[0]
+		Bs = Index[1]
+
+	h[np.ix_(Fs, Fs)] = hFF
+	h[np.ix_(Fs, Bs)] = hFB
+	h[np.ix_(Bs, Fs)] = hFB.T
+	h[np.ix_(Bs, Bs)] = hBB
+
+	return h
 
 def CompileFullV(VFFFF, VFFFB, VFFBB, VFBFB, VFBBB, VBBBB):
 	nF = VFFFF.shape[0]
@@ -68,7 +110,14 @@ def CompileFullV(VFFFF, VFFFB, VFFBB, VFBFB, VFBBB, VBBBB):
 
 	return V
 
-	
+def SVDOEI(h):
+	nF = h.shape[0]
+	U, S, T = np.linalg.svd(h)
+	print(T)
+	B = h @ T.T
+	print(B)
+	return B[:, :nF]
+
 # Assumes V is given as VFFFA in chemist notation
 def OneExternal(V, ReturnFull = False):
 	nF = V.shape[0]
@@ -275,14 +324,14 @@ if __name__ == '__main__':
 	VFFAA = VLO[np.ix_(FIndices, FIndices, BEIndices, BEIndices)]#[FIndices, :, :, :][:, FIndices, :, :][:, :, BEIndices, :][:, :, :, BEIndices]
 	VbbAA = np.einsum('ijkl,ip,jq->pqkl', VLO, TBath, TBath)
 	VbbAA = VbbAA[np.ix_(list(range(Nf)), list(range(Nf)), BEIndices, BEIndices)]
-	VFFBB = TwoExternal(VFFAA, VbbAA = VbbAA)
+	VFFBB = TwoExternal(VFFAA)
 	print(VFFBB)
 	VFAFA = VLO[np.ix_(FIndices, BEIndices, FIndices, BEIndices)]
 	VbAbA = np.einsum('ijkl,ip,kq->pjql', VLO, TBath, TBath)
 	VbAbA = VbAbA[np.ix_(list(range(Nf)), BEIndices, list(range(Nf)), BEIndices)]
 	VFAFA_Phys = np.swapaxes(VFAFA, 1, 2)
 	VbAbA_Phys = np.swapaxes(VbAbA, 1, 2)
-	VFBFB_Phys = TwoExternal(VFAFA_Phys, VbbAA = VbAbA_Phys)
+	VFBFB_Phys = TwoExternal(VFAFA_Phys)
 	VFBFB = np.swapaxes(VFBFB_Phys, 1, 2)
 	print(VFBFB)
 	VFAAA = VLO[np.ix_(FIndices, BEIndices, BEIndices, BEIndices)]
@@ -296,3 +345,12 @@ if __name__ == '__main__':
 	print(VTest)	
 	T = CheckSymmetry(VTest)
 	print(T)
+
+	hFA = hLO[np.ix_(FIndices, BEIndices)]
+	hFB = SVDOEI(hFA)
+	print(hFB)
+
+	hFF = hLO[np.ix_(FIndices, FIndices)]
+	hBB = hLO[np.ix_(BIndices, BIndices)]
+	hTest = CompileFullh(hFF, hFB, hBB)
+	print(hTest)	
