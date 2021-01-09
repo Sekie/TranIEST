@@ -29,6 +29,52 @@ def CheckSymmetry(ERI):
 	Sym = CheckCong(ERI2)
 	return Sym
 
+def MP2Corr(V, g, nOcc):
+	ECorr = 0.0
+	nVir = V.shape[0] - nOcc
+	for i in range(nOcc):
+		for j in range(nOcc):
+			for a in range(nVir):
+				for b in range(nVir):
+					ECorr += (2. * V[i, nVir + a, j, nVir + b] - V[i, nVir + b, j, nVir + a]) * V[i, nVir + a, j, nVir + b]# / (g[nOcc + a] + g[nOcc + b] - g[i] - g[j])
+	return ECorr
+
+def PartialMP2Corr(V):
+	ECorr = 0.0
+	n = V.shape[0]
+	for i in range(n):
+		for j in range(n):
+			for a in range(n):
+				for b in range(n):
+					ECorr += (2. * V[i, a, j, b] - V[i, b, j, a]) * V[i, a, j, b]
+	return ECorr
+
+def FragMP2Corr(V, FIndices):
+	ECorr = 0.0
+	n = V.shape[0]
+	for i in range(FIndices):
+		for j in range(n):
+			for a in range(n):
+				for b in range(n):
+					ECorr += (2. * V[i, a, j, b] - V[i, b, j, a]) * V[i, a, j, b]
+	return ECorr
+
+def CalcFragEnergy(h, hcore, V, P, G, CenterIndices):
+	FragE = 0.0
+	n = h.shape[0]
+	E1 = 0.0
+	E2 = 0.0
+	for i in CenterIndices:
+		for j in range(n):
+			FragE += 0.5 * (h[i, j] + hcore[i, j]) * P[i, j]
+			E1 += 0.5 * (h[i, j] + hcore[i, j]) * P[i, j]
+			for k in range(n):
+				for l in range(n):
+					FragE += 0.5 * G[i, j, k, l] * V[i, j, k, l]
+					E2 += 0.5 * G[i, j, k, l] * V[i, j, k, l]
+	return FragE
+
+
 def FragmentRMP2(h, hcore, V, CenterIndices, S = None):
 	if S is None:
 		S = np.eye(h.shape[0])
@@ -49,10 +95,31 @@ def FragmentRMP2(h, hcore, V, CenterIndices, S = None):
 	E, T2 = mp2.kernel()
 	P = mp2.make_rdm1()
 	P = C @ P @ C.T
+	print(P)
 	G = mp2.make_rdm2()
 	G = np.einsum('ijkl,ip,jq,kr,ls->pqrs', G, C, C, C, C)
 	FragE = CalcFragEnergy(h, hcore, V, P, G, CenterIndices)
 	return FragE
+
+def CustomRMP2(h, V, S = None):
+	if S is None:
+		S = np.eye(h.shape[0])
+	mol = gto.M()
+	n = h.shape[0]
+	mol.nelectron = n
+
+	mf = scf.RHF(mol)
+	mf.get_hcore = lambda *args: h
+	mf.get_ovlp = lambda *args: S
+	mf._eri = ao2mo.restore(8, V, n)
+	mf.max_cycle = 1000
+
+	mf.kernel()
+	C = mf.mo_coeff
+	
+	mp2 = mp.MP2(mf)
+	E, T2 = mp2.kernel()
+	print(E, mf.e_tot)
 
 def CompileFullh(hFF, hFB, hBB, Index = None):
 	nF = hFF.shape[0]
@@ -243,7 +310,7 @@ if __name__ == '__main__':
 	mo_occ = mo_coeff[:, :nocc]
 	mo_occ = np.dot(StoOrth.T, mo_occ)
 	P = np.dot(mo_occ, mo_occ.T)
-	Nf = 2
+	Nf = 1
 	PFrag = P[:Nf, :Nf]
 	PEnvBath = P[Nf:, Nf:]
 	eEnv, vEnv = np.linalg.eigh(PEnvBath)
@@ -290,6 +357,9 @@ if __name__ == '__main__':
 	hLO = reduce(np.dot, (StoOrig.T, mf.get_hcore(), StoOrig))
 	VLO = ao2mo.kernel(mol, StoOrig)
 	VLO = ao2mo.restore(1, VLO, hLO.shape[0])
+	hAO = mf.get_hcore()
+	VAO = ao2mo.kernel(mol, np.eye(StoOrig.shape[0]))
+	VAO = ao2mo.restore(1, VAO, hAO.shape[0])
 
 	VFrag = VSO[SIndices, :, :, :][:, SIndices, :, :][:, :, SIndices, :][:, :, :, SIndices]
 	hFrag = hSO[SIndices, :][:, SIndices]
@@ -318,6 +388,19 @@ if __name__ == '__main__':
 					t2[i, j, a, b] = 2.0 * T2[i, j, a, b] - T2[i, j, b, a]
 
 	RDM2 = mp2.make_rdm2()
+
+	#ETestCorr = MP2Corr(VMO, mf.mo_energy, int(N / 2))
+	#print("test corr", ETestCorr)
+	VMO_OVOV = np.zeros(VMO.shape)
+	for i in range(Nocc):
+		for j in range(Nocc):
+			for a in range(Nvir):
+				for b in range(Nvir):
+					VMO_OVOV[i, Nocc + a, j, Nocc + b] = VMO[i, Nocc + a, j, Nocc + b]
+	TMOtoLO = np.dot(TMOtoAO, StoOrig)
+	VLO_OVOV = np.einsum('ijkl,ip,jq,kr,ls->pqrs', VMO_OVOV, TMOtoLO, TMOtoLO, TMOtoLO, TMOtoLO)
+	#ETestCorr = PartialMP2Corr(VLO_OVOV)
+	#print("test corr", ETestCorr)
 
 	VFFFA = VLO[np.ix_(FIndices, FIndices, FIndices, BEIndices)] #VLO[FIndices, :, :, :][:, FIndices, :, :][:, :, FIndices, :][:, :, :, :]
 	VFFFB, TOneIdx = OneExternal(VFFFA)
@@ -353,4 +436,12 @@ if __name__ == '__main__':
 	hFF = hLO[np.ix_(FIndices, FIndices)]
 	hBB = hLO[np.ix_(BIndices, BIndices)]
 	hTest = CompileFullh(hFF, hFB, hBB)
-	print(hTest)	
+	print(hTest)
+
+	h0 = np.zeros(hLO.shape)
+	CustomRMP2(h0, VLO)
+	h0 = np.zeros((2 * Nf, 2 * Nf))
+	#from mp2_ml import FragmentRFCI
+	EFrag = FragmentRMP2(h0, h0, VTest, FIndices)
+	print(EFrag)
+	print(EFrag * N / Nf)
