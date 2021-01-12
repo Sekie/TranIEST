@@ -251,11 +251,13 @@ def ReshapeTwo(V):
 def TwoExternal(V, VbbAA = None, ReturnFull = False):
 	OrigDim = V.shape
 	nF = OrigDim[0]
-	VExtended = ReshapeTwo(V) #V.reshape(V.shape[0] * V.shape[1], V.shape[2] * V.shape[3])
+	VExtended = ReshapeTwo(V)
+	#VExtended = V.reshape(V.shape[0] * V.shape[1], V.shape[2] * V.shape[3])
 	U, S, T = np.linalg.svd(VExtended)
 	VExtended = VExtended @ T.T
 	if ReturnFull:
 		return ReshapeTwo(VExtended) #VExtended.reshape(OrigDim)
+	print(VExtended.shape)
 	VExtended = VExtended[:, :(S.shape[0])] #[:, :(nF * nF)]
 	#print(ReshapeTwo(VExtended))
 	if VbbAA is not None:
@@ -269,30 +271,29 @@ def TwoExternal(V, VbbAA = None, ReturnFull = False):
 		#print(VBathExtended)
 		VExtended = VExtended @ TB.T
 		return ReshapeTwo(VExtended) #VExtended.reshape(nF, nF, nF, nF)
-	return ReshapeTwo(VExtended) #VExtended.reshape(nF, nF, nF, nF)
+	return ReshapeTwo(VExtended) 
+	#return VExtended.reshape(nF, nF, nF, nF)
 
-#def ThreeExternal(V, ReturnFull = False):
-#	OrigDim = V.shape
-#	nF = OrigDim[0]
-#	VExtended = V.reshape(V.shape[0], V.shape[1] * V.shape[2] * V.shape[3])
-#	U, S, T = np.linalg.svd(VExtended)
-#	VExtended = VExtended @ T.T
-#	print(VExtended[:, :nF])
-#	Idx = list(range(nF))
-#	if ReturnFull:
-#		return VExtended.reshape(OrigDim)
-#	return VExtended.reshape(OrigDim)[np.ix_(Idx, Idx, Idx, Idx)]
+def ThreeExternalOld(V, ReturnFull = False):
+	OrigDim = V.shape
+	nF = OrigDim[0]
+	VExtended = V.reshape(V.shape[0], V.shape[1] * V.shape[2] * V.shape[3])
+	U, S, T = np.linalg.svd(VExtended)
+	VExtended = VExtended @ T.T
+	Idx = list(range(nF))
+	if ReturnFull:
+		return VExtended.reshape(OrigDim)
+	return VExtended.reshape(OrigDim)[np.ix_(Idx, Idx, Idx, Idx)]
 
 def ThreeExternal(V, ReturnFull = False):
-	VFABB = TwoExternal(V, ReturnFull = ReturnFull)
-	print(VFABB[0,0])
-	VBBFA = np.swapaxes(VFABB, 0, 2)
-	VBBFA = np.swapaxes(VBBFA, 1, 3)
-	print(VBBFA[:, :, 0, 0])
-	VBBFB = OneExternal(VBBFA, ReturnFull = ReturnFull)[0]
-	print(VBBFB)
-	VFBBB = np.swapaxes(VBBFB, 0, 2)
-	VFBBB = np.swapaxes(VFBBB, 1, 3)
+	#VFABB = TwoExternal(V, ReturnFull = ReturnFull)
+	#VFABB = ThreeExternalOld(V, ReturnFull = True)
+	VAAFA = np.swapaxes(V, 0, 2)
+	VAAFA = np.swapaxes(VAAFA, 1, 3)
+	VAAFB = OneExternal(VAAFA, ReturnFull = ReturnFull)[0]
+	VFBAA = np.swapaxes(VAAFB, 0, 2)
+	VFBAA = np.swapaxes(VFBAA, 1, 3)
+	VFBBB = TwoExternal(VFBAA, ReturnFull = ReturnFull)
 	return VFBBB
 
 if __name__ == '__main__':
@@ -444,18 +445,14 @@ if __name__ == '__main__':
 	#VFFFB = VFrag[np.ix_(FIndices, FIndices, FIndices, BIndices)]
 
 	VDO = CompileFullV(VFFFF, VFFFB, VFFBB, VFBFB, VFBBB, VBBBB)
-	#print(VTest)	
-	#T = CheckSymmetry(VTest)
-	#print(T)
 
 	hFA = hLO[np.ix_(FIndices, BEIndices)]
 	hFB = SVDOEI(hFA)
-	print(hFB)
+	#print(hFB)
 
 	hFF = hLO[np.ix_(FIndices, FIndices)]
 	hBB = hLO[np.ix_(BIndices, BIndices)]
 	hDO = CompileFullh(hFF, hFB, hBB)
-	#print(hDO)
 
 	ELO = FragMP2Corr(VLO, FIndices)
 	EDO = FragMP2Corr(VDO, FIndices)
@@ -465,7 +462,7 @@ if __name__ == '__main__':
 
 	VLOFFFB = VLO[np.ix_(FIndices, BEIndices, BEIndices, BEIndices)]
 	VSOFFFB = VSO[np.ix_(FIndices, BEIndices, BEIndices, BEIndices)]
-	VFragFFFB = VLO[np.ix_(FIndices, BIndices, BIndices, BIndices)]
+	VFragFFFB = VLO[np.ix_(FIndices, BEIndices, BIndices, BIndices)]
 
 	V2LO = SumSqMatrix(VLOFFFB)
 	V2SO = SumSqMatrix(VSOFFFB)
@@ -474,10 +471,10 @@ if __name__ == '__main__':
 	print("v2 calc", V2LO, V2DO, V2SO, V2Frag)
 
 
-	eLO = FragH(hLO, FIndices)
-	eDO = FragH(hDO, FIndices)
-	eSO = FragH(hSO, FIndices)
-	print("h calc:", eLO, eDO, eSO)
+	#eLO = FragH(hLO, FIndices)
+	#eDO = FragH(hDO, FIndices)
+	#eSO = FragH(hSO, FIndices)
+	#print("h calc:", eLO, eDO, eSO)
 
 	#h0 = np.zeros(hLO.shape)
 	#CustomRMP2(h0, VLO)
