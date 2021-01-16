@@ -60,6 +60,12 @@ def FragMP2Corr(V, FIndices):
 					ECorr += V[i, a, j, b]**2.
 	return ECorr
 
+def DoubleDoink(V):
+	DD = 0.0
+	for i in range(V.shape[0]):
+		DD += V[i, i, i, i]**2.
+	return DD
+
 def FragH(h, FIndicies):
 	E = 0.0
 	n = h.shape[1]
@@ -248,18 +254,19 @@ def ReshapeTwo(V):
 						VExpand[j, i, l, k] = V[ij, kl]
 		return VExpand
 
-def TwoExternal(V, VbbAA = None, ReturnFull = False):
+def TwoExternal(V, VbbAA = None, ReturnFull = False, UpperTriangleSVD = False):
 	OrigDim = V.shape
 	nF = OrigDim[0]
-	VExtended = ReshapeTwo(V)
-	#VExtended = V.reshape(V.shape[0] * V.shape[1], V.shape[2] * V.shape[3])
+	if UpperTriangleSVD:
+		VExtended = ReshapeTwo(V)
+	else:
+		VExtended = V.reshape(V.shape[0] * V.shape[1], V.shape[2] * V.shape[3])
 	U, S, T = np.linalg.svd(VExtended)
 	VExtended = VExtended @ T.T
 	if ReturnFull:
 		return ReshapeTwo(VExtended) #VExtended.reshape(OrigDim)
 	print(VExtended.shape)
 	VExtended = VExtended[:, :(S.shape[0])] #[:, :(nF * nF)]
-	#print(ReshapeTwo(VExtended))
 	if VbbAA is not None:
 		#Idx = list(range(nF)) + list(range(V.shape[2], V.shape[2] + nF))
 		TCut = T[:(S.shape[0]), :] #T[Idx, :]
@@ -271,8 +278,20 @@ def TwoExternal(V, VbbAA = None, ReturnFull = False):
 		#print(VBathExtended)
 		VExtended = VExtended @ TB.T
 		return ReshapeTwo(VExtended) #VExtended.reshape(nF, nF, nF, nF)
-	return ReshapeTwo(VExtended) 
-	#return VExtended.reshape(nF, nF, nF, nF)
+	if UpperTriangleSVD:
+		return ReshapeTwo(VExtended) 
+	else:
+		return VExtended.reshape(nF, nF, nF, nF)
+
+def MakeVFFBB(VFFAA):
+	VFFBB = TwoExternal(VFFAA, UpperTriangleSVD = False)
+	for f in range(VFFBB.shape[0]):
+		for g in range(VFFBB.shape[1]):
+			U, S, T = np.linalg.svd(VFFBB[f, g])
+			VFFBB[f, g] = np.zeros(VFFBB[f, g].shape)
+			np.fill_diagonal(VFFBB[f, g], S)
+	return VFFBB
+			
 
 def ThreeExternalOld(V, ReturnFull = False):
 	OrigDim = V.shape
@@ -288,12 +307,18 @@ def ThreeExternalOld(V, ReturnFull = False):
 def ThreeExternal(V, ReturnFull = False):
 	#VFABB = TwoExternal(V, ReturnFull = ReturnFull)
 	#VFABB = ThreeExternalOld(V, ReturnFull = True)
-	VAAFA = np.swapaxes(V, 0, 2)
-	VAAFA = np.swapaxes(VAAFA, 1, 3)
-	VAAFB = OneExternal(VAAFA, ReturnFull = ReturnFull)[0]
-	VFBAA = np.swapaxes(VAAFB, 0, 2)
-	VFBAA = np.swapaxes(VFBAA, 1, 3)
-	VFBBB = TwoExternal(VFBAA, ReturnFull = ReturnFull)
+
+	# Turn VFAAA into VFBAA
+	VFBAA = V.copy() #np.zeros((V.shape[0], V.shape[0], V.shape[2], V.shape[3]))
+	for p in range(V.shape[2]):
+		for q in range(V.shape[3]):
+			A = V[:, :, p, q]
+			U, S, T = np.linalg.svd(A)
+			B = A @ T.T
+			VFBAA[:, :, p, q] = B
+	VFBAA = VFBAA[:, :(V.shape[0]), :, :]
+
+	VFBBB = MakeVFFBB(VFBAA) #TwoExternal(VFBAA, ReturnFull = ReturnFull)
 	return VFBBB
 
 if __name__ == '__main__':
@@ -422,7 +447,7 @@ if __name__ == '__main__':
 	VFFAA = VLO[np.ix_(FIndices, FIndices, BEIndices, BEIndices)]#[FIndices, :, :, :][:, FIndices, :, :][:, :, BEIndices, :][:, :, :, BEIndices]
 	#VbbAA = np.einsum('ijkl,ip,jq->pqkl', VLO, TBath, TBath)
 	#VbbAA = VbbAA[np.ix_(list(range(Nf)), list(range(Nf)), BEIndices, BEIndices)]
-	VFFBB = TwoExternal(VFFAA)
+	VFFBB = MakeVFFBB(VFFAA) #TwoExternal(VFFAA)
 	#print(VFFBB)
 	VFAFA = VLO[np.ix_(FIndices, BEIndices, FIndices, BEIndices)]
 	#VbAbA = np.einsum('ijkl,ip,kq->pjql', VLO, TBath, TBath)
@@ -444,7 +469,15 @@ if __name__ == '__main__':
 	#VFBBB = VFrag[np.ix_(FIndices, BIndices, BIndices, BIndices)]
 	#VFFFB = VFrag[np.ix_(FIndices, FIndices, FIndices, BIndices)]
 
+	#VFFFF = np.zeros(VFFFF.shape)
+	#VFFFB = np.zeros(VFFFB.shape)
+	#VFFBB = np.zeros(VFFBB.shape)
+	#VFBBB = np.zeros(VFBBB.shape)
+	#VBBBB = np.zeros(VBBBB.shape)
+
 	VDO = CompileFullV(VFFFF, VFFFB, VFFBB, VFBFB, VFBBB, VBBBB)
+	Sym = CheckSymmetry(VDO)
+	print("sym", Sym)
 
 	hFA = hLO[np.ix_(FIndices, BEIndices)]
 	hFB = SVDOEI(hFA)
@@ -460,15 +493,27 @@ if __name__ == '__main__':
 	EFr = FragMP2Corr(VFrag, FIndices)
 	print("corr calc", ELO, EDO, ESO, EFr)
 
+	VLOFFFB = VLO[np.ix_(FIndices, FIndices, BEIndices, BEIndices)]
+	VSOFFFB = VSO[np.ix_(FIndices, FIndices, BEIndices, BEIndices)]
+	VFragFFFB = VLO[np.ix_(FIndices, FIndices, BIndices, BIndices)]
+
+	V2LO = SumSqMatrix(VLOFFFB)
+	V2SO = SumSqMatrix(VSOFFFB)
+	V2Frag = SumSqMatrix(VFragFFFB)
+	V2DO = SumSqMatrix(VFFBB)
+	print("v2 calc", V2LO, V2DO, V2SO, V2Frag)
+	print(np.sqrt(V2DO/V2LO))
+
 	VLOFFFB = VLO[np.ix_(FIndices, BEIndices, BEIndices, BEIndices)]
 	VSOFFFB = VSO[np.ix_(FIndices, BEIndices, BEIndices, BEIndices)]
-	VFragFFFB = VLO[np.ix_(FIndices, BEIndices, BIndices, BIndices)]
+	VFragFFFB = VLO[np.ix_(FIndices, BIndices, BIndices, BIndices)]
 
 	V2LO = SumSqMatrix(VLOFFFB)
 	V2SO = SumSqMatrix(VSOFFFB)
 	V2Frag = SumSqMatrix(VFragFFFB)
 	V2DO = SumSqMatrix(VFBBB)
 	print("v2 calc", V2LO, V2DO, V2SO, V2Frag)
+	print(np.sqrt(V2DO/V2LO))
 
 
 	#eLO = FragH(hLO, FIndices)
