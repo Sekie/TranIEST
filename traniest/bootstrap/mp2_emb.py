@@ -27,6 +27,8 @@ def CheckSymmetry(ERI):
 	ERI2 = np.swapaxes(ERI, 0, 2)
 	ERI2 = np.swapaxes(ERI2, 1, 3)
 	Sym = CheckCong(ERI2)
+	if Sym:
+		Sym = CheckSymmetryTwoFold(ERI)
 	return Sym
 
 def CheckSymmetryTwoFold(ERI):
