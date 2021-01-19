@@ -52,6 +52,7 @@ def PartialMP2Corr(V):
 def FragMP2Corr(V, FIndices):
 	ECorr = 0.0
 	n = V.shape[0]
+	print(FIndices)
 	for i in FIndices:
 		for j in range(n):
 			for a in range(n):
@@ -429,8 +430,8 @@ if __name__ == '__main__':
 
 	RDM2 = mp2.make_rdm2()
 
-	#ETestCorr = MP2Corr(VMO, mf.mo_energy, int(N / 2))
-	#print("test corr", ETestCorr)
+	ETestCorr = MP2Corr(VMO, mf.mo_energy, int(N / 2))
+	print("mp2 partial corr", ETestCorr)
 	VMO_OVOV = np.zeros(VMO.shape)
 	for i in range(Nocc):
 		for j in range(Nocc):
@@ -439,17 +440,20 @@ if __name__ == '__main__':
 					VMO_OVOV[i, Nocc + a, j, Nocc + b] = VMO[i, Nocc + a, j, Nocc + b]
 	TMOtoLO = np.dot(TMOtoAO, StoOrig)
 	VLO_OVOV = np.einsum('ijkl,ip,jq,kr,ls->pqrs', VMO_OVOV, TMOtoLO, TMOtoLO, TMOtoLO, TMOtoLO)
-	#ETestCorr = PartialMP2Corr(VLO_OVOV)
-	#print("test corr", ETestCorr)
+	ETestCorr = PartialMP2Corr(VLO_OVOV)
+	print("test corr", ETestCorr)
 
-	VFFFA = VLO[np.ix_(FIndices, FIndices, FIndices, BEIndices)] #VLO[FIndices, :, :, :][:, FIndices, :, :][:, :, FIndices, :][:, :, :, :]
+	sym = CheckSymmetry(VLO_OVOV)
+	print(sym)
+
+	VFFFA = VLO_OVOV[np.ix_(FIndices, FIndices, FIndices, BEIndices)] #VLO[FIndices, :, :, :][:, FIndices, :, :][:, :, FIndices, :][:, :, :, :]
 	VFFFB, TOneIdx = OneExternal(VFFFA)
-	VFFAA = VLO[np.ix_(FIndices, FIndices, BEIndices, BEIndices)]#[FIndices, :, :, :][:, FIndices, :, :][:, :, BEIndices, :][:, :, :, BEIndices]
+	VFFAA = VLO_OVOV[np.ix_(FIndices, FIndices, BEIndices, BEIndices)]#[FIndices, :, :, :][:, FIndices, :, :][:, :, BEIndices, :][:, :, :, BEIndices]
 	#VbbAA = np.einsum('ijkl,ip,jq->pqkl', VLO, TBath, TBath)
 	#VbbAA = VbbAA[np.ix_(list(range(Nf)), list(range(Nf)), BEIndices, BEIndices)]
 	VFFBB = MakeVFFBB(VFFAA) #TwoExternal(VFFAA)
 	#print(VFFBB)
-	VFAFA = VLO[np.ix_(FIndices, BEIndices, FIndices, BEIndices)]
+	VFAFA = VLO_OVOV[np.ix_(FIndices, BEIndices, FIndices, BEIndices)]
 	#VbAbA = np.einsum('ijkl,ip,kq->pjql', VLO, TBath, TBath)
 	#VbAbA = VbAbA[np.ix_(list(range(Nf)), BEIndices, list(range(Nf)), BEIndices)]
 	VFAFA_Phys = np.swapaxes(VFAFA, 1, 2)
@@ -457,11 +461,11 @@ if __name__ == '__main__':
 	VFBFB_Phys = TwoExternal(VFAFA_Phys)
 	VFBFB = np.swapaxes(VFBFB_Phys, 1, 2)
 	#print(VFBFB)
-	VFAAA = VLO[np.ix_(FIndices, BEIndices, BEIndices, BEIndices)]
+	VFAAA = VLO_OVOV[np.ix_(FIndices, BEIndices, BEIndices, BEIndices)]
 	VFBBB = ThreeExternal(VFAAA)
 	#print(VFBBB)
 
-	VFFFF = VFrag[np.ix_(FIndices, FIndices, FIndices, FIndices)]
+	VFFFF = VLO_OVOV[np.ix_(FIndices, FIndices, FIndices, FIndices)]
 	VBBBB = VFrag[np.ix_(BIndices, BIndices, BIndices, BIndices)]
 
 	#VFFBB = VFrag[np.ix_(FIndices, FIndices, BIndices, BIndices)]
@@ -479,6 +483,22 @@ if __name__ == '__main__':
 	Sym = CheckSymmetry(VDO)
 	print("sym", Sym)
 
+	# FFBF and FBBF are not formed from 2 fold symmetry
+	VFFAF = VLO_OVOV[np.ix_(FIndices, FIndices, BEIndices, FIndices)]
+	VFFAF_FFFA = np.swapaxes(VFFAF, 2, 3)
+	VFFBF_FFFB, TOneIdx = OneExternal(VFFAF_FFFA)
+	VFFBF = np.swapaxes(VFFBF_FFFB, 2, 3)
+
+	VFAAF = VLO_OVOV[np.ix_(FIndices, BEIndices, BEIndices, FIndices)]
+	VFAAF_FAFA_FFAA = np.swapaxes(VFAAF, 2, 3)
+	VFAAF_FAFA_FFAA = np.swapaxes(VFAAF_FAFA_FFAA, 1, 2)
+	VFBBF_FBFB_FFBB = TwoExternal(VFAAF_FAFA_FFAA)
+	VFBBF = np.swapaxes(VFBBF_FBFB_FFBB, 1, 2)
+	VFBBF = np.swapaxes(VFBBF, 2, 3)
+
+	VDO[np.ix_(FIndices, FIndices, BIndices, FIndices)] = VFFBF
+	VDO[np.ix_(FIndices, BIndices, BIndices, FIndices)] = VFBBF
+
 	hFA = hLO[np.ix_(FIndices, BEIndices)]
 	hFB = SVDOEI(hFA)
 	#print(hFB)
@@ -487,34 +507,60 @@ if __name__ == '__main__':
 	hBB = hLO[np.ix_(BIndices, BIndices)]
 	hDO = CompileFullh(hFF, hFB, hBB)
 
-	ELO = FragMP2Corr(VLO, FIndices)
+	ELO = FragMP2Corr(VLO_OVOV, FIndices)
 	EDO = FragMP2Corr(VDO, FIndices)
-	ESO = FragMP2Corr(VSO, FIndices)
-	EFr = FragMP2Corr(VFrag, FIndices)
-	print("corr calc", ELO, EDO, ESO, EFr)
+	#ESO = FragMP2Corr(VSO, FIndices)
+	#EFr = FragMP2Corr(VFrag, FIndices)
+	print("corr calc", ELO, EDO)
+	print("sq V", (VLO_OVOV*VLO_OVOV).sum(), (VDO*VDO).sum())
 
-	VLOFFFB = VLO[np.ix_(FIndices, FIndices, BEIndices, BEIndices)]
-	VSOFFFB = VSO[np.ix_(FIndices, FIndices, BEIndices, BEIndices)]
-	VFragFFFB = VLO[np.ix_(FIndices, FIndices, BIndices, BIndices)]
+	#VLOFFFB = VLO[np.ix_(FIndices, FIndices, BEIndices, BEIndices)]
+	#VSOFFFB = VSO[np.ix_(FIndices, FIndices, BEIndices, BEIndices)]
+	#VFragFFFB = VLO[np.ix_(FIndices, FIndices, BIndices, BIndices)]
 
-	V2LO = SumSqMatrix(VLOFFFB)
-	V2SO = SumSqMatrix(VSOFFFB)
-	V2Frag = SumSqMatrix(VFragFFFB)
+	#V2LO = SumSqMatrix(VLOFFFB)
+	#V2SO = SumSqMatrix(VSOFFFB)
+	#V2Frag = SumSqMatrix(VFragFFFB)
+	#V2DO = SumSqMatrix(VFFBB)
+	#print("v2 calc", V2LO, V2DO, V2SO, V2Frag)
+	#print(np.sqrt(V2DO/V2LO))
+
+	#VLOFFFB = VLO[np.ix_(FIndices, BEIndices, BEIndices, BEIndices)]
+	#VSOFFFB = VSO[np.ix_(FIndices, BEIndices, BEIndices, BEIndices)]
+	#VFragFFFB = VLO[np.ix_(FIndices, BIndices, BIndices, BIndices)]
+
+	#V2LO = SumSqMatrix(VLOFFFB)
+	#V2SO = SumSqMatrix(VSOFFFB)
+	#V2Frag = SumSqMatrix(VFragFFFB)
+	#V2DO = SumSqMatrix(VFBBB)
+	#print("v2 calc", V2LO, V2DO, V2SO, V2Frag)
+	#print(np.sqrt(V2DO/V2LO))
+
+	VLO_OVOV_XXXX = VLO_OVOV[np.ix_(FIndices, FIndices, FIndices, FIndices)]
+	V2LO = SumSqMatrix(VLO_OVOV_XXXX)
+	V2DO = SumSqMatrix(VFFFF)
+	print("v2 calc", V2LO - V2DO)
+
+	VLO_OVOV_XXXX = VLO_OVOV[np.ix_(FIndices, FIndices, FIndices, BEIndices)]
+	V2LO = SumSqMatrix(VLO_OVOV_XXXX)
+	V2DO = SumSqMatrix(VFFFB)
+	print("v2 calc", V2LO - V2DO)
+
+	VLO_OVOV_XXXX = VLO_OVOV[np.ix_(FIndices, FIndices, BEIndices, BEIndices)]
+	V2LO = SumSqMatrix(VLO_OVOV_XXXX)
+	print(VLO_OVOV_XXXX)
 	V2DO = SumSqMatrix(VFFBB)
-	print("v2 calc", V2LO, V2DO, V2SO, V2Frag)
-	print(np.sqrt(V2DO/V2LO))
+	print("v2 calc", V2LO - V2DO)
 
-	VLOFFFB = VLO[np.ix_(FIndices, BEIndices, BEIndices, BEIndices)]
-	VSOFFFB = VSO[np.ix_(FIndices, BEIndices, BEIndices, BEIndices)]
-	VFragFFFB = VLO[np.ix_(FIndices, BIndices, BIndices, BIndices)]
+	VLO_OVOV_XXXX = VLO_OVOV[np.ix_(FIndices, BEIndices, FIndices, BEIndices)]
+	V2LO = SumSqMatrix(VLO_OVOV_XXXX)
+	V2DO = SumSqMatrix(VFBFB)
+	print("v2 calc", V2LO - V2DO)
 
-	V2LO = SumSqMatrix(VLOFFFB)
-	V2SO = SumSqMatrix(VSOFFFB)
-	V2Frag = SumSqMatrix(VFragFFFB)
+	VLO_OVOV_XXXX = VLO_OVOV[np.ix_(FIndices, BEIndices, BEIndices, BEIndices)]
+	V2LO = SumSqMatrix(VLO_OVOV_XXXX)
 	V2DO = SumSqMatrix(VFBBB)
-	print("v2 calc", V2LO, V2DO, V2SO, V2Frag)
-	print(np.sqrt(V2DO/V2LO))
-
+	print("v2 calc", V2LO - V2DO)
 
 	#eLO = FragH(hLO, FIndices)
 	#eDO = FragH(hDO, FIndices)
