@@ -283,7 +283,7 @@ def OneExternal(V, ReturnFull = False):
 		for j in range(nF):
 			U, S, T = np.linalg.svd(V[i, j])
 			B[i, j] = V[i, j] @ T.T
-			#print(i, j, "\n", B[i, j])
+			print(i, j, "\n", B[i, j])
 	if ReturnFull:
 		return B, T
 	return B[:, :, :, :nF], T
@@ -354,6 +354,25 @@ def TwoExternal(V, VbbAA = None, ReturnFull = False, UpperTriangleSVD = False):
 		return VExtended.reshape(nF, nF, nF, nF)
 
 def MakeVFFBB(VFFAA):
+	nF = VFFAA.shape[0]
+	nBE = VFFAA.shape[2]
+
+	# These are the transformation matrices, one for fixeg fp and one for fixed gq in (fg|pq)
+	Tfp = np.zeros((nF, nBE, nBE, nF)) # Index: fpqy
+	Tgq = np.zeros((nF, nBE, nBE, nF)) # Index: gqpx
+
+	for f in range(nF):
+		for p in range(nBE):
+			Vpq = VFFAA[f, :, p, :]
+			U, S, T = np.linalg.svd(Vpq)
+			Tfp[f, p] = T.T[:, :nF]
+			Vpq = VFFAA[:, f, :, p]
+			U, S, T = np.linalg.svd(Vpq)
+			Tgq[f, p] = T.T[:, :nF]
+	VFFBB = np.einsum('fgpq,fpqy,gqpx->fgxy', VFFAA, Tfp, Tgq)
+	return VFFBB
+
+def MakeVFFBB_PostSVD(VFFAA):
 	VFFBB = TwoExternal(VFFAA, UpperTriangleSVD = False)
 	for f in range(VFFBB.shape[0]):
 		for g in range(VFFBB.shape[1]):
@@ -395,7 +414,7 @@ if __name__ == '__main__':
 	from functools import reduce
 	from pyscf import gto, scf, mp, lo, ao2mo
 	from frankenstein.tools.tensor_utils import get_symm_mat_pow
-	N = 6
+	N = 20
 	nocc = int(N / 2)
 	r = 1.0
 	mol = gto.Mole()
@@ -497,18 +516,28 @@ if __name__ == '__main__':
 				for b in range(Nvir):
 					t2[i, j, a, b] = 2.0 * T2[i, j, a, b] - T2[i, j, b, a]
 
+	TMOtoLO = np.dot(TMOtoAO, StoOrig)
 	RDM2 = mp2.make_rdm2()
+	RDM2LO = np.einsum('ijkl,ip,jq,kr,ls->pqrs', RDM2, TMOtoLO, TMOtoLO, TMOtoLO, TMOtoLO)
+	np.save("2RDM", RDM2LO)
 
 	ETestCorr = MP2Corr(VMO, mf.mo_energy, int(N / 2))
 	print("mp2 partial corr", ETestCorr)
 	VMO_OVOV = np.zeros(VMO.shape)
+	TMO = np.zeros(VMO.shape)
+	tMO = np.zeros(VMO.shape)
 	for i in range(Nocc):
 		for j in range(Nocc):
 			for a in range(Nvir):
 				for b in range(Nvir):
 					VMO_OVOV[i, Nocc + a, j, Nocc + b] = VMO[i, Nocc + a, j, Nocc + b]
-	TMOtoLO = np.dot(TMOtoAO, StoOrig)
-	VLO_OVOV = np.einsum('ijkl,ip,jq,kr,ls->pqrs', VMO_OVOV, TMOtoLO, TMOtoLO, TMOtoLO, TMOtoLO)
+					TMO[i, j, Nocc + a, Nocc + b] = T2[i, j, a, b]
+					tMO[i, j, Nocc + a, Nocc + b] = t2[i, j, a, b]
+	VLO_OVOV = VLO #np.einsum('ijkl,ip,jq,kr,ls->pqrs', VMO_OVOV, TMOtoLO, TMOtoLO, TMOtoLO, TMOtoLO)
+	TLO = np.einsum('ijab,ip,jq,ar,bs->pqrs', TMO, TMOtoLO, TMOtoLO, TMOtoLO, TMOtoLO)
+	tLO = np.einsum('ijab,ip,jq,ar,bs->pqrs', tMO, TMOtoLO, TMOtoLO, TMOtoLO, TMOtoLO)
+	np.save("TLO", TLO)
+	np.save("tLO", tLO)
 	ETestCorr = PartialMP2Corr(VLO_OVOV)
 	print("test corr", ETestCorr)
 
@@ -518,10 +547,13 @@ if __name__ == '__main__':
 	VFFFA = VLO_OVOV[np.ix_(FIndices, FIndices, FIndices, BEIndices)] #VLO[FIndices, :, :, :][:, FIndices, :, :][:, :, FIndices, :][:, :, :, :]
 	VFFFB, TOneIdx = OneExternal(VFFFA)
 	VFFAA = VLO_OVOV[np.ix_(FIndices, FIndices, BEIndices, BEIndices)]#[FIndices, :, :, :][:, FIndices, :, :][:, :, BEIndices, :][:, :, :, BEIndices]
+	print(VFFAA.shape)
+	np.save("VFFAA", VFFAA)
 	#VbbAA = np.einsum('ijkl,ip,jq->pqkl', VLO, TBath, TBath)
 	#VbbAA = VbbAA[np.ix_(list(range(Nf)), list(range(Nf)), BEIndices, BEIndices)]
 	VFFBB = MakeVFFBB(VFFAA) #TwoExternal(VFFAA)
-	#print(VFFBB)
+	print(VFFBB)
+	#print((VFFAA*VFFAA).sum(), (VFFBB*VFFBB).sum())
 	VFAFA = VLO_OVOV[np.ix_(FIndices, BEIndices, FIndices, BEIndices)]
 	#VbAbA = np.einsum('ijkl,ip,kq->pjql', VLO, TBath, TBath)
 	#VbAbA = VbAbA[np.ix_(list(range(Nf)), BEIndices, list(range(Nf)), BEIndices)]
@@ -548,9 +580,9 @@ if __name__ == '__main__':
 	#VFBBB = np.zeros(VFBBB.shape)
 	#VBBBB = np.zeros(VBBBB.shape)
 
-	#VDO = CompileFullV(VFFFF, VFFFB, VFFBB, VFBFB, VFBBB, VBBBB)
-	#Sym = CheckSymmetry(VDO)
-	#print("sym", Sym)
+	VDO = CompileFullV(VFFFF, VFFFB, VFFBB, VFBFB, VFBBB, VBBBB)
+	Sym = CheckSymmetry(VDO)
+	print("sym", Sym)
 
 	# These are not formed from 2 fold symmetry
 	VFFAF = VLO_OVOV[np.ix_(FIndices, FIndices, BEIndices, FIndices)]
@@ -625,6 +657,9 @@ if __name__ == '__main__':
 	V2LO = SumSqMatrix(VLO_OVOV_XXXX)
 	V2DO = SumSqMatrix(VFFFF)
 	print("v2 calc", V2LO, V2DO)
+	VXLO = CrossSqMatrix(VLO_OVOV_XXXX, VLO_OVOV_XXXX)
+	VXDO = CrossSqMatrix(VFFFF, VFFFF)
+	print("vx calc", VXLO, VXDO)
 
 	print("FFFB")
 	VLO_OVOV_XXXX = VLO_OVOV[np.ix_(FIndices, FIndices, FIndices, BEIndices)]
@@ -669,6 +704,54 @@ if __name__ == '__main__':
 	VXLO = CrossSqMatrix(VLO_OVOV_XXXX, VLO_OVOV_XXXX2)
 	VXDO = CrossSqMatrix(VFBBB, VFBBB)
 	print("vx calc", VXLO, VXDO)
+
+
+	print("FFBF")
+	VLO_OVOV_XXXX = VLO_OVOV[np.ix_(FIndices, FIndices, BEIndices, FIndices)]
+	V2LO = SumSqMatrix(VLO_OVOV_XXXX)
+	V2DO = SumSqMatrix(VFFBF)
+	print("v2 calc", V2LO, V2DO)
+	VLO_OVOV_XXXX2 = VLO_OVOV[np.ix_(FIndices, FIndices, BEIndices, FIndices)]
+	VXLO = CrossSqMatrix(VLO_OVOV_XXXX, VLO_OVOV_XXXX2)
+	VXDO = CrossSqMatrix(VFFBF, VFFBF)
+	print("vx calc", VXLO, VXDO)
+
+
+	print("FBBF")
+	VLO_OVOV_XXXX = VLO_OVOV[np.ix_(FIndices, BEIndices, BEIndices, FIndices)]
+	V2LO = SumSqMatrix(VLO_OVOV_XXXX)
+	V2DO = SumSqMatrix(VFBBF)
+	print("v2 calc", V2LO, V2DO)
+	VLO_OVOV_XXXX2 = VLO_OVOV[np.ix_(FIndices, FIndices, BEIndices, BEIndices)]
+	VXLO = CrossSqMatrix(VLO_OVOV_XXXX, VLO_OVOV_XXXX2)
+	VXDO = CrossSqMatrix(VFBBF, VFFBB)
+	print("vx calc", VXLO, VXDO)
+
+
+	print("BFBF")
+	VLO_OVOV_XXXX = VLO_OVOV[np.ix_(BEIndices, FIndices, BEIndices, FIndices)]
+	V2LO = SumSqMatrix(VLO_OVOV_XXXX)
+	V2DO = SumSqMatrix(VBFBF)
+	print("v2 calc", V2LO, V2DO)
+	VLO_OVOV_XXXX2 = VLO_OVOV[np.ix_(BEIndices, FIndices, BEIndices, FIndices)]
+	VXLO = CrossSqMatrix(VLO_OVOV_XXXX, VLO_OVOV_XXXX2)
+	VXDO = CrossSqMatrix(VBFBF, VBFBF)
+	print("vx calc", VXLO, VXDO)
+
+
+	print("BFBB")
+	VLO_OVOV_XXXX = VLO_OVOV[np.ix_(BEIndices, FIndices, BEIndices, BEIndices)]
+	V2LO = SumSqMatrix(VLO_OVOV_XXXX)
+	V2DO = SumSqMatrix(VBFBB)
+	print("v2 calc", V2LO, V2DO)
+	VLO_OVOV_XXXX2 = VLO_OVOV[np.ix_(BEIndices, BEIndices, BEIndices, FIndices)]
+	VXLO = CrossSqMatrix(VLO_OVOV_XXXX, VLO_OVOV_XXXX2)
+	VBBBF = np.swapaxes(VBFBB, 0, 2)
+	VBBBF = np.swapaxes(VBBBF, 1, 3)
+	VXDO = CrossSqMatrix(VBFBB, VBBBF)
+	print("vx calc", VXLO, VXDO)
+
+
 
 
 	#eLO = FragH(hLO, FIndices)
