@@ -21,11 +21,12 @@ def T2LocalizedBasis(VMO, FMO, TMOtoLO, NumOcc, NumVir):
 	FLO = TMOtoLO.T @ FMO @ TMOtoLO
 	OccList = list(range(NumOcc))
 	VirList = list(range(NumOcc, NumOcc + NumVir))
-	VMO_OVOV = np.zeros(VMO)
+	VMO_OVOV = np.zeros(VMO.shape)
 	VMO_OVOV[np.ix_(OccList, VirList, OccList, VirList)] = VMO[np.ix_(OccList, VirList, OccList, VirList)]
 	VLO_OVOV = Rotate4DTensor(VMO_OVOV, TMOtoLO)
 	T2LO = np.zeros(VMO.shape)
 	t2LO = np.zeros(VMO.shape)
+	print(FLO)
 	for i in range(T2LO.shape[0]):
 		for j in range(T2LO.shape[1]):
 			for a in range(T2LO.shape[2]):
@@ -38,6 +39,16 @@ def T2LocalizedBasis(VMO, FMO, TMOtoLO, NumOcc, NumVir):
 					t2LO = 2 * T2LO[i, j, a, b] - T2LO[i, j, b, a]
 	return T2LO, t2LO
 
+def MakePairDensity(T, t):
+	PairP = np.zeros(T.shape) 
+	for i in range(PairP.shape[0]):
+		for j in range(PairP.shape[1]):
+			Pij = np.dot(t[i, j].T, T[i, j]) + np.dot(t[i, j], T[i, j].T)
+			if i == j:
+				Pij = Pij / 2
+			PairP[i, j] = Pij
+	return PairP
+	
 def PrintNumPNO(P, tol = 1e-10):
 	for i in range(P.shape[0]):
 		Occi = []
@@ -79,10 +90,11 @@ def NewtonRaphson(f, x0, df, args, tol = 1e-10, eps = 1e-6):
 	print("Starting Newton Raphson")
 	while not abs(F) < tol: #all([abs(x) < tol for x in F]):
 		print("NR step", it)
-		t1 = Timer("Derivative Calculation")
-		t1.start()
+		#t1 = Timer("Derivative Calculation")
+		#t1.start()
 		J = df(x, *args)
-		t1.stop()
+		print(x, F)
+		#t1.stop()
 		#print("L =", F)
 		#print("J\n", J)
 		#try:
@@ -98,17 +110,43 @@ def NewtonRaphson(f, x0, df, args, tol = 1e-10, eps = 1e-6):
 		#print("dx =", dx)
 		#x, F = BacktrackLineSearch(f, x, dx, args, y0 = F) #x - alp * JInv @ F
 		x = x + dx
-		t2 = Timer("Calculate Loss")
-		t2.start()
+		#t2 = Timer("Calculate Loss")
+		#t2.start()
 		F = f(x, *args)
-		t2.stop()
-		print(Timer.timers)
+		#t2.stop()
+		#print(Timer.timers)
 		it += 1
 		#print("x =", x)
 		#print("L =", F)
 		#print((F**2.0).sum())
 		#input()
 	return x
+
+def BisectionMethod(f, x0, args, tol = 1e-10):
+	xa = x0[0]
+	xb = x0[1]
+	Fa = f(xa, *args)
+	Fb = f(xb, *args)
+	xc = (xa + xb) / 2
+	Fc = f(xc, *args)
+	it = 1
+	print("Starting Bisection Method")
+	while not abs(Fc) < tol:
+		print("Bisection step", it)
+		xc = (xa + xb) / 2
+		Fc = f(xc, *args)
+		print(xc, Fc)
+		if np.sign(Fc) == np.sign(Fa):
+			xa = xc
+			Fa = Fc
+		else:
+			xb = xc
+			Fb = Fc
+		it += 1
+		if abs(xa - xb) < 1e-16:
+			break
+	return xc
+	
 
 def CalcFragEnergy(h, hcore, V, P, G, CenterIndices):
 	n = h.shape[0]
@@ -227,15 +265,15 @@ if __name__ == '__main__':
 	from pyscf import gto, scf, mp, lo, ao2mo
 	from frankenstein.tools.tensor_utils import get_symm_mat_pow
 	mol = gto.M()
-	mol.fromfile("0.xyz")
+	#mol.fromfile("0.xyz")
 	#mol.atom = 'H 0 0 0; H 1 0 0; H 1 1 0; H 0 1 0'
-	#CC = 1.39
-	#CH = 1.09
-	#for i in range(6):
-	#	angle = i / 6.0 * 2.0 * np.pi
-	#	mol.atom.append(('C', (CC * np.sin(angle), CC * np.cos(angle), 0)))
-	#	mol.atom.append(('H', ((CH + CC) * np.sin(angle), (CH + CC) * np.cos(angle), 0)))
-	mol.basis = 'cc-pvdz'
+	CC = 0.5 #1.39
+	CH = 0.5 #1.09
+	for i in range(20):
+		angle = i / 20.0 * 2.0 * np.pi
+		#mol.atom.append(('C', (CC * np.sin(angle), CC * np.cos(angle), 0)))
+		mol.atom.append(('H', ((CH + CC) * np.sin(angle), (CH + CC) * np.cos(angle), 0)))
+	mol.basis = 'sto-3g'
 	# H - 5 basis functions, C - 14 basis functions
 	mol.build()
 	ne = mol.nelec
@@ -249,7 +287,7 @@ if __name__ == '__main__':
 	#FragStart = NBasisC * 2 + NBasisH * 5 # Leave out the first CH3CH2 chunk
 	#FragEnd = FragStart + NBasisC * 1 + NBasisH * 2 # CH2 Fragment
 	FragStart = 0
-	Nf = NBasisC * 1 + NBasisH * 1
+	Nf = 1 #NBasisC * 1 + NBasisH * 1
 	FragEnd = FragStart + Nf
 
 	nocc = int(np.sum(mf.mo_occ) / 2)
@@ -353,14 +391,11 @@ if __name__ == '__main__':
 				for b in range(Nvir):
 					t2[i, j, a, b] = 2.0 * T2[i, j, a, b] - T2[i, j, b, a]
 
-	#EFragMP2 = FragmentRMP2(hNoCore, hFrag, VFrag, FIndices)
+	EFragMP2 = FragmentRMP2(hNoCore, hFrag, VFrag, FIndices)
 	#print(EFragMP2 * 6)
-	#NewtonRaphson(ErrorChemicalPotential, 0.0, dErrorChemicalPotential, [[hNoCore, hFrag, VFrag, FIndices], nelec / 6, FIndices])
+	NewtonRaphson(ErrorChemicalPotential, 0.0, dErrorChemicalPotential, [[hNoCore, hFrag, VFrag, FIndices], nelec / 20, FIndices])
 
 	TMOtoLO = np.dot(TMOtoAO, StoOrig)
-	#RDM2 = mp2.make_rdm2()
-	#RDM2LO = np.einsum('ijkl,ip,jq,kr,ls->pqrs', RDM2, TMOtoLO, TMOtoLO, TMOtoLO, TMOtoLO)
-	#np.save("2RDM", RDM2LO)
 
 	#VMO_OVOV = np.zeros(VMO.shape)
 	TMO = np.zeros(VMO.shape)
@@ -369,14 +404,39 @@ if __name__ == '__main__':
 	VirIdx = list(range(Nocc, Norb))
 	TMO[np.ix_(OccIdx, OccIdx, VirIdx, VirIdx)] = T2
 	tMO[np.ix_(OccIdx, OccIdx, VirIdx, VirIdx)] = t2
+	T2LO = Rotate4DTensor(TMO, TMOtoLO)
+	t2LO = Rotate4DTensor(tMO, TMOtoLO)
+	print(T2LO[0, 0])
+	T2LO_FFAA = np.zeros((len(FIndices), len(FIndices), len(BEIndices), len(BEIndices)))	
+	t2LO_FFAA = np.zeros((len(FIndices), len(FIndices), len(BEIndices), len(BEIndices)))	
+	T2LO_FFAA = T2LO[np.ix_(FIndices, FIndices, BEIndices, BEIndices)]
+	t2LO_FFAA = t2LO[np.ix_(FIndices, FIndices, BEIndices, BEIndices)]
+	PairP = MakePairDensity(T2LO_FFAA, t2LO_FFAA)
+	ePNO, vPNO = np.linalg.eigh(PairP[0, 0])
+	print(ePNO)
+	PNOIdx = [i for i, v in enumerate(ePNO) if v > 2e-5]
+	print(len(PNOIdx))
+	PNOs = np.zeros((Norb, len(PNOIdx)))
+	PNOs[BEIndices, :] = vPNO[:, PNOIdx]
+	TAOtoPNO = np.dot(StoOrig, PNOs)
+	TFrag = np.concatenate((TTotal[:, FIndices], TAOtoPNO), axis = 1)
+	hFrag = reduce(np.dot, (TFrag.T, mf.get_hcore(), TFrag))
+	VFrag = ao2mo.kernel(mol, TFrag)
+	VFrag = ao2mo.restore(1, VFrag, hFrag.shape[0])
 
-	#VLO_OVOV = VLO #np.einsum('ijkl,ip,jq,kr,ls->pqrs', VMO_OVOV, TMOtoLO, TMOtoLO, TMOtoLO, TMOtoLO)
-	#TLO = np.einsum('ijab,ip,jq,ar,bs->pqrs', TMO, TMOtoLO, TMOtoLO, TMOtoLO, TMOtoLO)
-	#tLO = np.einsum('ijab,ip,jq,ar,bs->pqrs', tMO, TMOtoLO, TMOtoLO, TMOtoLO, TMOtoLO)
-	#np.save("TLO", TLO)
-	#np.save("tLO", tLO)
-	#ETestCorr = PartialMP2Corr(VLO_OVOV)
-	#print("test corr", ETestCorr)
+	#NewtonRaphson(ErrorChemicalPotential, 0.0, dErrorChemicalPotential, [[hFrag, hFrag, VFrag, FIndices], nelec / 20, FIndices])
+	BisectionMethod(ErrorChemicalPotential, [-3., 3.], [[hFrag, hFrag, VFrag, FIndices], nelec / 20, FIndices])
+
+
+
+	'''
+	#VMO_OVOV = np.zeros(VMO.shape)
+	TMO = np.zeros(VMO.shape)
+	tMO = np.zeros(VMO.shape)
+	OccIdx = list(range(Nocc))
+	VirIdx = list(range(Nocc, Norb))
+	TMO[np.ix_(OccIdx, OccIdx, VirIdx, VirIdx)] = T2
+	tMO[np.ix_(OccIdx, OccIdx, VirIdx, VirIdx)] = t2
 
 	T2MMVV = np.zeros((Norb, Norb, Nvir, Nvir))
 	t2MMVV = np.zeros((Norb, Norb, Nvir, Nvir))
@@ -395,9 +455,9 @@ if __name__ == '__main__':
 	#		e, v = np.linalg.eigh(Pij)
 	#PrintNumPNO(PairP, tol = 1e-5)
 	#ePNO, vPNO = np.linalg.eigh(PairP[4, 4])
-	P88 = np.dot(t2LLVV[8, 8].T, T2LLVV[8, 8]) + np.dot(t2LLVV[8, 8], T2LLVV[8, 8].T)
-	P88 = P88 / 2
-	ePNO, vPNO = np.linalg.eigh(P88)
+	#P88 = np.dot(t2LLVV[8, 8].T, T2LLVV[8, 8]) + np.dot(t2LLVV[8, 8], T2LLVV[8, 8].T)
+	#P88 = P88 / 2
+	#ePNO, vPNO = np.linalg.eigh(P88)
 	PNOIdx = [i for i, v in enumerate(ePNO) if v < 1e-6]
 	PNOs = vPNO[:, PNOIdx]
 	TMOtoPNO = np.zeros((Norb, len(PNOIdx)))
@@ -421,4 +481,4 @@ if __name__ == '__main__':
 	print(EFragMP2 * 6)
 	#NewtonRaphson(ErrorChemicalPotential, 0.0, dErrorChemicalPotential, [[hNoCore, hFragAndPNO, VFragAndPNO, FIndices], nelec / 6, FIndices])
 
-
+	'''
