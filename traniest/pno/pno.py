@@ -17,6 +17,15 @@ def Rotate4DTensor(A, R):
 			V[i, j] = Y
 	return V
 
+def HalfRotate4DTensor(A, R):
+	from functools import reduce
+	Vmmaa = np.zeros((R.shape[1], R.shape[1], A.shape[2], A.shape[3]))
+	for i in range(A.shape[2]):
+		for j in range(A.shape[3]):
+			Y = reduce(np.dot, (R.T, A[:, :, i, j], R))
+			Vmmaa[:, :, i, j] = Y
+	return Vmmaa
+	
 def T2LocalizedBasis(VMO, FMO, TMOtoLO, NumOcc, NumVir):
 	FLO = TMOtoLO.T @ FMO @ TMOtoLO
 	OccList = list(range(NumOcc))
@@ -48,6 +57,15 @@ def MakePairDensity(T, t):
 				Pij = Pij / 2
 			PairP[i, j] = Pij
 	return PairP
+
+def TracePairDensity(PairP, Idx = None):
+	if Idx == None:
+		Idx = list(range(PairP.shape[0]))
+	P = np.zeros(PairP[0, 0].shape)
+	for i in Idx:
+		for j in Idx:
+			P += PairP[i, j]
+	return P
 	
 def PrintNumPNO(P, tol = 1e-10):
 	for i in range(P.shape[0]):
@@ -180,8 +198,8 @@ def FragmentRMP2(h, hcore, V, CenterIndices, mu = None, n = None, S = None):
 	mol.nelectron = n
 	mol.max_memory = 32000
 
-	x1 = Timer("do scf")
-	x1.start()
+	#x1 = Timer("do scf")
+	#x1.start()
 	mf = scf.RHF(mol)
 	mf.get_hcore = lambda *args: hcore
 	mf.get_ovlp = lambda *args: S
@@ -189,37 +207,37 @@ def FragmentRMP2(h, hcore, V, CenterIndices, mu = None, n = None, S = None):
 	mf.max_cycle = 1000
 
 	mf.kernel()
-	x1.stop()
+	#x1.stop()
 	mo_coeff = mf.mo_coeff
 	C = mo_coeff.T
 
-	x2 = Timer("do mp2")
-	x2.start()
+	#x2 = Timer("do mp2")
+	#x2.start()
 	mp2 = mp.MP2(mf)
 	mp2.verboseint = 0
-	mp2.max_memory = 8000
+	mp2.max_memory = 32000
 	E, T2 = mp2.kernel(with_t2 = False)
-	x2.stop()
+	#x2.stop()
 
-	x3 = Timer("make rdm")
-	x33 = Timer("xform rdm")
-	x3.start()
+	#x3 = Timer("make rdm")
+	#x33 = Timer("xform rdm")
+	#x3.start()
 	P = mp2.make_rdm1()
-	x3.stop()
-	x33.start()
+	#x3.stop()
+	#x33.start()
 	P = C.T @ P @ C
-	x33.stop()
-	x3.start()
+	#x33.stop()
+	#x3.start()
 	#print(P)
 	G = mp2.make_rdm2()
-	x3.stop()
-	x33.start()
+	#x3.stop()
+	#x33.start()
 	G = Rotate4DTensor(G, C)
 	#G = np.einsum('ijkl,ip,jq,kr,ls->pqrs', G, C, C, C, C)
-	x33.stop()
+	#x33.stop()
 
-	x4 = Timer("add mu")
-	x4.start()
+	#x4 = Timer("add mu")
+	#x4.start()
 	#E1 = np.einsum('pq,qp->', hcore, P)
 	#E2 = np.einsum('pqrs,pqrs->', G, V)
 	#print(E1 + E2)
@@ -228,15 +246,15 @@ def FragmentRMP2(h, hcore, V, CenterIndices, mu = None, n = None, S = None):
 	else:
 		hnew = h
 		hcorenew = hcore
-	x4.stop()
+	#x4.stop()
 
-	x5 = Timer("calc frag energy")
-	x5.start()
+	#x5 = Timer("calc frag energy")
+	#x5.start()
 	FragE = CalcFragEnergy(hnew, hcorenew, V, P, G, CenterIndices)
 	print("Frag E =", FragE)
-	x5.stop()
+	#x5.stop()
 
-	print(Timer.timers)
+	#print(Timer.timers)
 	return FragE, P
 
 def CustomRMP2(h, V, S = None):
@@ -265,14 +283,14 @@ if __name__ == '__main__':
 	from pyscf import gto, scf, mp, lo, ao2mo
 	from frankenstein.tools.tensor_utils import get_symm_mat_pow
 	mol = gto.M()
-	#mol.fromfile("0.xyz")
+	mol.fromfile("0.xyz")
 	#mol.atom = 'H 0 0 0; H 1 0 0; H 1 1 0; H 0 1 0'
-	CC = 0.5 #1.39
-	CH = 0.5 #1.09
-	for i in range(20):
-		angle = i / 20.0 * 2.0 * np.pi
-		#mol.atom.append(('C', (CC * np.sin(angle), CC * np.cos(angle), 0)))
-		mol.atom.append(('H', ((CH + CC) * np.sin(angle), (CH + CC) * np.cos(angle), 0)))
+	#CC = 0.5 #1.39
+	#CH = 0.5 #1.09
+	#for i in range(20):
+	#	angle = i / 20.0 * 2.0 * np.pi
+	#	#mol.atom.append(('C', (CC * np.sin(angle), CC * np.cos(angle), 0)))
+	#		mol.atom.append(('H', ((CH + CC) * np.sin(angle), (CH + CC) * np.cos(angle), 0)))
 	mol.basis = 'sto-3g'
 	# H - 5 basis functions, C - 14 basis functions
 	mol.build()
@@ -282,12 +300,13 @@ if __name__ == '__main__':
 	mf = scf.RHF(mol)
 	mf.kernel()
 	print("E_elec(HF) =", mf.e_tot - mf.energy_nuc())
-	NBasisC = 14
-	NBasisH = 5
+	NBasisC = 5
+	NBasisH = 1
 	#FragStart = NBasisC * 2 + NBasisH * 5 # Leave out the first CH3CH2 chunk
 	#FragEnd = FragStart + NBasisC * 1 + NBasisH * 2 # CH2 Fragment
 	FragStart = 0
-	Nf = 1 #NBasisC * 1 + NBasisH * 1
+	Nf = NBasisC * 1 + NBasisH * 1
+	NumFrag = 6
 	FragEnd = FragStart + Nf
 
 	nocc = int(np.sum(mf.mo_occ) / 2)
@@ -333,6 +352,7 @@ if __name__ == '__main__':
 	print(PEnv)
 	FIndices = list(range(Nf)) # In the Schmidt space
 	BIndices = list(range(Nf, Nf + len(BathOrbs))) # In the Schmidt space
+	print("Num Frag and Bath", Nf, len(BathOrbs))
 	BEIndices = list(range(Nf, N))
 	SIndices = FIndices + BIndices
 	CoreIdx = [i + Nf for i in CoreOrbs]
@@ -385,18 +405,25 @@ if __name__ == '__main__':
 	Norb = Nocc + Nvir
 	print(T2.shape)
 	t2 = np.zeros((Nocc, Nocc, Nvir, Nvir))
+	time1 = Timer("Make t2")
+	time1.start()
 	for i in range(Nocc):
 		for j in range(Nocc):
 			for a in range(Nvir):
 				for b in range(Nvir):
 					t2[i, j, a, b] = 2.0 * T2[i, j, a, b] - T2[i, j, b, a]
+	time1.stop()
 
 	EFragMP2 = FragmentRMP2(hNoCore, hFrag, VFrag, FIndices)
 	#print(EFragMP2 * 6)
-	NewtonRaphson(ErrorChemicalPotential, 0.0, dErrorChemicalPotential, [[hNoCore, hFrag, VFrag, FIndices], nelec / 20, FIndices])
+	NewtonRaphson(ErrorChemicalPotential, 0.0, dErrorChemicalPotential, [[hNoCore, hFrag, VFrag, FIndices], nelec / NumFrag, FIndices])
 
+	time2 = Timer("Make TMOtoLO")
+	time2.start()
 	TMOtoLO = np.dot(TMOtoAO, StoOrig)
+	time2.stop()
 
+	'''
 	#VMO_OVOV = np.zeros(VMO.shape)
 	TMO = np.zeros(VMO.shape)
 	tMO = np.zeros(VMO.shape)
@@ -424,12 +451,13 @@ if __name__ == '__main__':
 	VFrag = ao2mo.kernel(mol, TFrag)
 	VFrag = ao2mo.restore(1, VFrag, hFrag.shape[0])
 
-	#NewtonRaphson(ErrorChemicalPotential, 0.0, dErrorChemicalPotential, [[hFrag, hFrag, VFrag, FIndices], nelec / 20, FIndices])
-	BisectionMethod(ErrorChemicalPotential, [-3., 3.], [[hFrag, hFrag, VFrag, FIndices], nelec / 20, FIndices])
-
-
-
+	#NewtonRaphson(ErrorChemicalPotential, 0.0, dErrorChemicalPotential, [[hFrag, hFrag, VFrag, FIndices], nelec / NumFrag, FIndices])
+	BisectionMethod(ErrorChemicalPotential, [-3., 3.], [[hFrag, hFrag, VFrag, FIndices], nelec / NumFrag, FIndices])
 	'''
+
+
+	time3 = Timer("def TMO")
+	time3.start()
 	#VMO_OVOV = np.zeros(VMO.shape)
 	TMO = np.zeros(VMO.shape)
 	tMO = np.zeros(VMO.shape)
@@ -442,33 +470,37 @@ if __name__ == '__main__':
 	t2MMVV = np.zeros((Norb, Norb, Nvir, Nvir))
 	T2MMVV[:Nocc, :, :, :][:, :Nocc, :, :] = T2
 	t2MMVV[:Nocc, :, :, :][:, :Nocc, :, :] = t2
-	T2LLVV = np.einsum('ijkl,ia,jb->abkl', T2MMVV, TMOtoLO, TMOtoLO)
-	t2LLVV = np.einsum('ijkl,ia,jb->abkl', t2MMVV, TMOtoLO, TMOtoLO)
+	time3.stop()
+	time7 = Timer("einsum TMO")
+	time7.start()
+	T2LLVV = HalfRotate4DTensor(T2MMVV, TMOtoLO) #np.einsum('ijkl,ia,jb->abkl', T2MMVV, TMOtoLO, TMOtoLO)
+	t2LLVV = HalfRotate4DTensor(t2MMVV, TMOtoLO) #np.einsum('ijkl,ia,jb->abkl', t2MMVV, TMOtoLO, TMOtoLO)
+	time7.stop()
 
-	#PairP = np.zeros((len(FIndices), len(FIndices), Nvir, Nvir))
-	#for f, i in enumerate(FIndices):
-	#	for g, j in enumerate(FIndices):
-	#		Pij = np.dot(t2LLVV[i, j].T, T2LLVV[i, j]) + np.dot(t2LLVV[i, j], T2LLVV[i, j].T)
-	#		if i == j:
-	#			Pij = Pij / 2
-	#		PairP[f, g] = Pij
-	#		e, v = np.linalg.eigh(Pij)
-	#PrintNumPNO(PairP, tol = 1e-5)
-	#ePNO, vPNO = np.linalg.eigh(PairP[4, 4])
-	#P88 = np.dot(t2LLVV[8, 8].T, T2LLVV[8, 8]) + np.dot(t2LLVV[8, 8], T2LLVV[8, 8].T)
-	#P88 = P88 / 2
-	#ePNO, vPNO = np.linalg.eigh(P88)
-	PNOIdx = [i for i, v in enumerate(ePNO) if v < 1e-6]
+	time4 = Timer("Make Pair Density")
+	time4.start()
+	PairP = MakePairDensity(T2MMVV, t2MMVV) #np.zeros((len(FIndices), len(FIndices), Nvir, Nvir))
+	time4.stop()
+	time5 = Timer("Trace pair density")
+	time5.start()
+	PairPFrag = TracePairDensity(PairP)
+	time5.stop()
+	ePNO, vPNO = np.linalg.eigh(PairPFrag)
+	print(ePNO)
+	PNOIdx = [i for i, v in enumerate(ePNO) if v > 0.05]
+	print(len(PNOIdx))
 	PNOs = vPNO[:, PNOIdx]
 	TMOtoPNO = np.zeros((Norb, len(PNOIdx)))
 	TMOtoPNO[VirIdx, :] = PNOs
 
+	time6 = Timer("rotate ints")
+	time6.start()
 	TAOtoPNO = np.dot(mo_coeff, TMOtoPNO)
 	TFragAndPNO = np.concatenate((TFrag, TAOtoPNO), axis = 1)
 	hFragAndPNO = reduce(np.dot, (TFragAndPNO.T, mf.get_hcore(), TFragAndPNO))
 	VFragAndPNO = ao2mo.kernel(mol, TFragAndPNO)
 	VFragAndPNO = ao2mo.restore(1, VFragAndPNO, hFragAndPNO.shape[0])
-
+	time6.stop()
 	hNoCore = hFragAndPNO.copy()
 	for i in SIndices:
 		for j in SIndices:
@@ -477,8 +509,9 @@ if __name__ == '__main__':
 				CoreContribution += (2.0 * VSO[i, j, c, c] - VSO[i, c, c, j])
 			hFragAndPNO[i, j] += CoreContribution
 
-	EFragMP2 = FragmentRMP2(hNoCore, hFragAndPNO, VFragAndPNO, FIndices)[0]
-	print(EFragMP2 * 6)
-	#NewtonRaphson(ErrorChemicalPotential, 0.0, dErrorChemicalPotential, [[hNoCore, hFragAndPNO, VFragAndPNO, FIndices], nelec / 6, FIndices])
-
-	'''
+	#EFragMP2 = FragmentRMP2(hNoCore, hFragAndPNO, VFragAndPNO, FIndices)[0]
+	#print(EFragMP2 * 6)
+	print(Timer.timers)
+	print(aasdfs)
+	NewtonRaphson(ErrorChemicalPotential, -0.45, dErrorChemicalPotential, [[hNoCore, hFragAndPNO, VFragAndPNO, FIndices], nelec / NumFrag, FIndices])
+	#BisectionMethod(ErrorChemicalPotential, [-.6, -.3], [[hNoCore, hFragAndPNO, VFragAndPNO, FIndices], nelec / NumFrag, FIndices])
