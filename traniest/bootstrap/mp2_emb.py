@@ -414,7 +414,7 @@ if __name__ == '__main__':
 	from functools import reduce
 	from pyscf import gto, scf, mp, lo, ao2mo
 	from frankenstein.tools.tensor_utils import get_symm_mat_pow
-	N = 20
+	N = 6
 	nocc = int(N / 2)
 	r = 1.0
 	mol = gto.Mole()

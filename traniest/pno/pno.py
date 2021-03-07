@@ -3,6 +3,22 @@ from scipy.optimize import newton
 import math
 from timer import Timer
 
+def GramSchmidt(A, Start = 0):
+	B = A.copy()
+	for j in range(Start, B.shape[1] - 1):
+		CurrentColIdx = j + 1
+		CurrentColVec = B[:, CurrentColIdx]
+		Projections = CurrentColVec.T @ B[:, :CurrentColIdx]
+		for i in range(j + 1):
+			CurrentColVec -= Projections[i] * B[:, i]
+		Norm = np.linalg.norm(CurrentColVec)
+		if Norm < 1e-10:
+			CurrentColVec = np.zeros(CurrentColVec.shape)
+		else:
+			CurrentColVec = CurrentColVec / Norm
+		B[:, CurrentColIdx] = CurrentColVec
+	return B
+
 def Rotate4DTensor(A, R):
 	from functools import reduce
 	Vmmaa = np.zeros((R.shape[1], R.shape[1], A.shape[2], A.shape[3]))
@@ -199,17 +215,17 @@ def CalcFragEnergy(h, hcore, V, P, G, CenterIndices):
 	E2 = (VFrag * GFrag).sum() / 2
 	return E1 + E2
 
-def CalcFragEnergy_(h, hcore, V, P, G, CenterIndices):
+def CalcFragEnergy_(h, hcore, V, P, G):
 	n = h.shape[0]
-	AllIndices = list(range(len(CenterIndices) * 2))
+	CenterIndices = [11]
+	AllIndices = list(range(n))
 	hhFrag = h[CenterIndices] + hcore[CenterIndices]
 	PFrag = P[CenterIndices]
-	E1 = (hhFrag * PFrag)[:, AllIndices].sum() / 2
-	VFrag = V[np.ix_(CenterIndices, AllIndices, AllIndices, AllIndices)]
-	GFrag = G[np.ix_(CenterIndices, AllIndices, AllIndices, AllIndices)]
+	E1 = (hhFrag * PFrag).sum() / 2
+	VFrag = V[CenterIndices]
+	GFrag = G[CenterIndices]
 	E2 = (VFrag * GFrag).sum() / 2
 	return E1 + E2
-
 
 def FragmentRMP2(h, hcore, V, CenterIndices, n = None, mu = None, S = None):
 	if S is None:
@@ -218,7 +234,6 @@ def FragmentRMP2(h, hcore, V, CenterIndices, n = None, mu = None, S = None):
 	if n is None:
 		n = h.shape[0]
 	mol.nelectron = n
-	print(mol.nelectron)
 	mol.max_memory = 32000
 	mol.verbose = 0
 
@@ -240,6 +255,7 @@ def FragmentRMP2(h, hcore, V, CenterIndices, n = None, mu = None, S = None):
 	mp2 = mp.MP2(mf)
 	mp2.max_memory = 32000
 	E, T2 = mp2.kernel(with_t2 = False)
+	print("E MP2 Raw =", E)
 	#x2.stop()
 
 	#x3 = Timer("make rdm")
@@ -273,11 +289,13 @@ def FragmentRMP2(h, hcore, V, CenterIndices, n = None, mu = None, S = None):
 
 	#x5 = Timer("calc frag energy")
 	#x5.start()
+	#FragE = CalcFragEnergy_(hnew, hcorenew, V, P, G)
 	FragE = CalcFragEnergy(hnew, hcorenew, V, P, G, CenterIndices)
 	print("Frag E =", FragE)
 	#x5.stop()
 
 	#print(Timer.timers)
+	#print(np.diag(P))
 	return FragE, P
 
 def CustomRMP2(h, V, S = None):
@@ -314,12 +332,11 @@ if __name__ == '__main__':
 	#	angle = i / 20.0 * 2.0 * np.pi
 	#	#mol.atom.append(('C', (CC * np.sin(angle), CC * np.cos(angle), 0)))
 	#		mol.atom.append(('H', ((CH + CC) * np.sin(angle), (CH + CC) * np.cos(angle), 0)))
-	mol.basis = 'cc-pvdz'
+	mol.basis = 'sto-3g'
 	# H - 5 basis functions, C - 14 basis functions
 	mol.build()
 	ne = mol.nelec
 	nelec = ne[0] + ne[1]
-	print("Number of Electrons:", nelec)
 
 	mf = scf.RHF(mol)
 	mf.kernel()
@@ -345,6 +362,8 @@ if __name__ == '__main__':
 	mo_coeff = mf.mo_coeff
 	StoOrth = get_symm_mat_pow(S, 0.50)
 	StoOrig = get_symm_mat_pow(S, -0.5)
+	np.save("StoOrth", StoOrth)
+	np.save("StoOrig", StoOrig)
 	mo_occ = mo_coeff[:, :nocc]
 	PAO = np.dot(mo_occ, mo_occ.T)
 	mo_occ = np.dot(StoOrth.T, mo_occ)
@@ -387,7 +406,6 @@ if __name__ == '__main__':
 	SIndices = FIndices + BIndices
 	CoreIdx = [i + Nf for i in CoreOrbs]
 
-	print(PHFFrag)
 	PHFFrag = PSO[np.ix_(SIndices, SIndices)]
 	NumOccFrag = int(round(np.trace(PHFFrag)))
 
@@ -417,31 +435,29 @@ if __name__ == '__main__':
 	hFrag = reduce(np.dot, (TFrag.T, mf.get_hcore(), TFrag))
 	VFrag = ao2mo.kernel(mol, TFrag)
 	VFrag = ao2mo.restore(1, VFrag, hFrag.shape[0])
-	VFragTest = ao2mo.outcore.full(mol, TFrag, "VFragOutcore", dataname = "V", compact = False)
 
 	#VFrag = VSO[SIndices, :, :, :][:, SIndices, :, :][:, :, SIndices, :][:, :, :, SIndices]
 	#hFrag = hSO[SIndices, :][:, SIndices]
 	hNoCore = hFrag.copy()
-	Genv = np.zeros(hFrag.shape)
-	print(len(CoreIdx))
-	for i in SIndices:
-		for j in SIndices:
-			CoreContribution = 0.0
-			for c in CoreIdx:
-				CoreContribution += (2.0 * VSO[i, j, c, c] - VSO[i, c, c, j])
-			hFrag[i, j] += CoreContribution
-			Genv[i, j] += CoreContribution
+	#for i in SIndices:
+	#	for j in SIndices:
+	#		CoreContribution = 0.0
+	#		for c in CoreIdx:
+	#			CoreContribution += (2.0 * VSO[i, j, c, c] - VSO[i, c, c, j])
+	#		hFrag[i, j] += CoreContribution
 
-	STFrag = S @ TFrag
-	PFrag = STFrag.T @ PAO @ STFrag
-	print(PFrag)
-	GCore = GetGCore(VAO, PAO, VFrag, PFrag, TFrag)
+	#STFrag = S @ TFrag
+	#PFrag = STFrag.T @ PAO @ STFrag
+	GCore = GetGCore(VAO, PAO, VFrag, PHFFrag, TFrag)
+	np.save("GCore", GCore)
 	hFrag = hNoCore + GCore
-	np.save("heff", hFrag)
-	np.save("h", hNoCore)
 	mp2 = mp.MP2(mf)
 	mp2.max_memory = 32000
 	E, T2 = mp2.kernel()
+
+	MP2RDM = mp2.make_rdm1()
+	MP2RDMAO = TMOtoAO.T @ MP2RDM @ TMOtoAO
+
 	print("E_elec(MP2) =", mf.e_tot + E - mf.energy_nuc())
 	#EMP2 = mf.e_tot + E - mf.energy_nuc()	
 
@@ -456,12 +472,14 @@ if __name__ == '__main__':
 	time1.stop()
 
 	EFragMP2, PFragMP2 = FragmentRMP2(hNoCore, hFrag, VFrag, FIndices, n = 2 * NumOccFrag)
-	np.save("PFrag", PFragMP2)
+	np.savetxt("be-density0.txt", PFragMP2, delimiter = '\t')
 	#print(EFragMP2 * 6)
 	mu = NewtonRaphson(ErrorChemicalPotential, 0.0, dErrorChemicalPotential, [[hNoCore, hFrag, VFrag, FIndices, 2 * NumOccFrag], nelec / NumFrag, FIndices])
 	hnew, hcorenew = UpdateOEIwithMu(hNoCore, hFrag, mu, FIndices)
 	EFrag, PFrag = FragmentRMP2(hnew, hcorenew, VFrag, FIndices, n = 2 * NumOccFrag, mu = mu)
-	#np.savetxt("be-density.txt", PFrag, delimiter = '\t')
+	np.savetxt("be-density.txt", PFrag, delimiter = '\t')
+
+	print("BE Energy:", NumFrag * EFrag)
 
 	time2 = Timer("Make TMOtoLO")
 	time2.start()
@@ -504,6 +522,10 @@ if __name__ == '__main__':
 
 	# PNO-BE Theory
 	
+	print("BEGIN PNO-BE")
+	# pnobe_tol = 1e-3
+	num_pno = 1
+	
 	time3 = Timer("def TMO")
 	time3.start()
 	#VMO_OVOV = np.zeros(VMO.shape)
@@ -532,15 +554,18 @@ if __name__ == '__main__':
 	time4.start()
 	PairP = MakePairDensity(T2LLVV, t2LLVV) #np.zeros((len(FIndices), len(FIndices), Nvir, Nvir))
 	time4.stop()
+	print("Fragment-NonFragment block of Pair Density")
+	print(np.sqrt((PairP[np.ix_(FIndices, BEIndices)]**2).sum()))
 	time5 = Timer("Trace pair density")
 	time5.start()
-	PairPFrag = TracePairDensity(PairP)
+	PairPFrag = TracePairDensity(PairP, Idx = FIndices)
 	time5.stop()
 	ePNO, vPNO = np.linalg.eigh(PairPFrag)
-	np.savetxt("PNOOcc.txt", ePNO, delimiter = '\n')
 	print(ePNO)
-	PNOIdx = [i for i, v in enumerate(ePNO) if v > 0.02]
-	print(len(PNOIdx))
+	np.savetxt("ePNO.txt", ePNO, delimiter = '\n')
+	#PNOIdx = [i for i, v in enumerate(ePNO) if v > pnobe_tol]
+	PNOIdx = list(range(len(ePNO) - num_pno, len(ePNO)))
+	print("Number of included PNOs:", len(PNOIdx))
 	PNOs = vPNO[:, PNOIdx]
 	TMOtoPNO = np.zeros((Norb, len(PNOIdx)))
 	TMOtoPNO[VirIdx, :] = PNOs
@@ -549,31 +574,57 @@ if __name__ == '__main__':
 	time6.start()
 	TAOtoPNO = np.dot(mo_coeff, TMOtoPNO)
 	TFragAndPNO = np.concatenate((TFrag, TAOtoPNO), axis = 1)
+	TLOtoFBPNO_NotOrth = StoOrth @ TFragAndPNO
+	TLOtoFBPNO = GramSchmidt(TLOtoFBPNO_NotOrth, TFrag.shape[1] - 1)
+	TFragAndPNO = StoOrig @ TLOtoFBPNO
+	np.save("TFBPNO", TFragAndPNO)
 	hFragAndPNO = reduce(np.dot, (TFragAndPNO.T, mf.get_hcore(), TFragAndPNO))
 	VFragAndPNO = ao2mo.kernel(mol, TFragAndPNO)
 	VFragAndPNO = ao2mo.restore(1, VFragAndPNO, hFragAndPNO.shape[0])
 	time6.stop()
-	hNoCore = hFragAndPNO.copy()
-	for i in SIndices:
-		for j in SIndices:
-			CoreContribution = 0.0
-			for c in CoreIdx:
-				CoreContribution += (2.0 * VSO[i, j, c, c] - VSO[i, c, c, j])
-			hFragAndPNO[i, j] += CoreContribution
 
-	#EFragMP2 = FragmentRMP2(hNoCore, hFragAndPNO, VFragAndPNO, FIndices)[0]
+	MP2RDMFragAndPNO = TFragAndPNO.T @ MP2RDMAO @ TFragAndPNO
+	np.savetxt("mp2_rdm1_fragpno.txt", MP2RDMFragAndPNO)
+
+	hNoCore = hFragAndPNO.copy()
+	#for i in SIndices:
+	#	for j in SIndices:
+	#		CoreContribution = 0.0
+	#		for c in CoreIdx:
+	#			CoreContribution += (2.0 * VSO[i, j, c, c] - VSO[i, c, c, j])
+	#		hFragAndPNO[i, j] += CoreContribution
+
+	STFragAndPNO = S @ TFragAndPNO
+	PHFFragAndPNO = STFragAndPNO.T @ PAO @ STFragAndPNO
+	GCore = GetGCore(VAO, PAO, VFragAndPNO, PHFFragAndPNO, TFragAndPNO)
+	np.save("GCorePNO", GCore)
+	np.save("PHFFBPNO", PHFFragAndPNO)
+	np.save("VFBPNO", VFragAndPNO)
+
+	NumOccFrag = int(round(np.trace(PHFFragAndPNO)))
+	print(np.diag(PHFFragAndPNO))
+	print("PNO-BE Frag Occ:", NumOccFrag)
+	
+	EFragMP2, PFragMP2 = FragmentRMP2(hNoCore, hFragAndPNO, VFragAndPNO, FIndices, n = 2 * NumOccFrag)
+	np.savetxt("bepno-density0.txt", PFragMP2, delimiter = '\t')
 	#print(EFragMP2 * 6)
 	print(Timer.timers)
-	#NewtonRaphson(ErrorChemicalPotential, 0.0, dErrorChemicalPotential, [[hNoCore, hFragAndPNO, VFragAndPNO, FIndices, 2 * NumOccFrag], nelec / NumFrag, FIndices])
 	mu = BisectionMethod(ErrorChemicalPotential, [-2., 2.], [[hNoCore, hFragAndPNO, VFragAndPNO, FIndices, 2 * NumOccFrag], nelec / NumFrag, FIndices], tol = 1e-5)
-
+	#mu = NewtonRaphson(ErrorChemicalPotential, 0.0, dErrorChemicalPotential, [[hNoCore, hFragAndPNO, VFragAndPNO, FIndices, 2 * NumOccFrag], nelec / NumFrag, FIndices])
 	hnew, hcorenew = UpdateOEIwithMu(hNoCore, hFragAndPNO, mu, FIndices)
-	FragE, PFrag = FragmentRMP2(hnew, hcorenew, VFragAndPNO, FIndices, n = 2 * NumOccFrag, mu = mu)
-	np.savetxt("pno-be-density.txt", PFrag, delimiter = '\t')
+	EFrag, PFrag = FragmentRMP2(hnew, hcorenew, VFragAndPNO, FIndices, n = 2 * NumOccFrag, mu = mu)
+	np.savetxt("bepno-density.txt", PFrag, delimiter = '\t')
+
+
+	print("PNO-BE Energy:", NumFrag * EFrag)
+	
 
 
 	# PNO Disentanglement method
-	'''
+'''	
+	print("BEGIN PNO DISENTANGLE")	
+	PNO_RDM_lambda = 1.
+
 	TMO = np.zeros(VMO.shape)
 	tMO = np.zeros(VMO.shape)
 	OccIdx = list(range(Nocc))
@@ -583,6 +634,127 @@ if __name__ == '__main__':
 
 	TLO = Rotate4DTensor(TMO, TMOtoLO)
 	tLO = Rotate4DTensor(tMO, TMOtoLO)
+	MP2RDM = TMOtoLO.T @ MP2RDM @ TMOtoLO
+	np.save("MP2RDM", MP2RDM)
 
 	PairP = MakePairDensity(TLO, tLO)
-	'''
+	PairPFrag = TracePairDensity(PairP, Idx = FIndices)
+
+	mo_coeff = mf.mo_coeff
+	StoOrth = get_symm_mat_pow(S, 0.50)
+	StoOrig = get_symm_mat_pow(S, -0.5)
+	mo_occ = mo_coeff[:, :nocc]
+	PAO = np.dot(mo_occ, mo_occ.T)
+	mo_occ = np.dot(StoOrth.T, mo_occ)
+	mo_vir = mo_coeff[:, nocc:]
+	#mo_vir = np.dot(StoOrth.T, mo_vir) # Maybe not the best idea to localize it
+	P = np.dot(mo_occ, mo_occ.T)
+	FIdx = list(range(FragStart, FragEnd))
+	AIdx = list(range(N))
+	BEIdx = list(set(AIdx) - set(FIdx))
+	np.save("HFRDM", P)
+	PEnvBath = (1.0 - PNO_RDM_lambda) * P[np.ix_(BEIdx, BEIdx)] + PNO_RDM_lambda * MP2RDM[np.ix_(BEIdx, BEIdx)] #PairPFrag[np.ix_(BEIdx, BEIdx)]
+	eEnv, vEnv = np.linalg.eigh(PEnvBath)
+	pnolambdaname = "mp2lambda_" + str(PNO_RDM_lambda)
+	np.savetxt(pnolambdaname, eEnv, delimiter = '\n')
+	thresh = 1.e-6
+	BathOrbs = [i for i, v in enumerate(eEnv) if v > thresh and v < 1.0 - thresh]
+	print(len(BathOrbs))
+	EnvOrbs  = [i for i, v in enumerate(eEnv) if v < thresh or v > 1.0 - thresh]
+	CoreOrbs = [i for i, v in enumerate(eEnv) if v > 1.0 - thresh]
+	print(len(CoreOrbs))
+	TBath = np.zeros((N, len(BathOrbs)))
+	TBath[BEIdx, :] = vEnv[:,BathOrbs]
+	TEnv  = np.zeros((N, len(EnvOrbs)))
+	TEnv[BEIdx, :] = vEnv[:, EnvOrbs]
+	TFrag = np.zeros((N, Nf))
+	TFrag[FIdx, :] = np.eye(Nf)
+	TSch = np.concatenate((TFrag, TBath), axis = 1)
+	T = np.concatenate((TSch, TEnv), axis = 1)
+	BathOrbs = [x + Nf for x in BathOrbs]
+	SchOrbs = list(range(Nf)) + BathOrbs
+	EnvOrbs = [x + Nf for x in EnvOrbs]
+	PEnv = reduce(np.dot, (TEnv.T, P, TEnv))
+	PSch = reduce(np.dot, (TSch.T, P, TSch))
+	PEnv[PEnv < thresh] = 0.0
+	PEnv[PEnv > 1.0 - thresh] = 1.0
+	print(PSch)
+	print(PEnv)
+	PSO = reduce(np.dot, (T.T, P, T))
+	FIndices = list(range(Nf)) # In the Schmidt space
+	BIndices = list(range(Nf, Nf + len(BathOrbs))) # In the Schmidt space
+	print("Num Frag and Bath", Nf, len(BathOrbs))
+	BEIndices = list(range(Nf, N))
+	SIndices = FIndices + BIndices
+	CoreIdx = [i + Nf for i in CoreOrbs]
+
+	PHFFrag = PSO[np.ix_(SIndices, SIndices)]
+	NumOccFrag = int(round(np.trace(PHFFrag)))
+	print("Num Electrons in Fragment:", NumOccFrag * 2)
+
+	TTotal = np.dot(StoOrig, T) # AO to SO
+	TMOtoAO = np.linalg.inv(mo_coeff)
+	TMOtoSO = np.dot(TMOtoAO, TTotal)
+	TFragMOtoSO = TMOtoSO[:, FIndices]
+	TFragOccMOtoSO = TFragMOtoSO[:nocc, :]
+	TFragVirMOtoSO = TFragMOtoSO[nocc:, :]
+
+	hSO = reduce(np.dot, (TTotal.T, mf.get_hcore(), TTotal))
+	VSO = ao2mo.kernel(mol, TTotal)
+	VSO = ao2mo.restore(1, VSO, hSO.shape[0])
+	hMO = reduce(np.dot, (mo_coeff.T, mf.get_hcore(), mo_coeff))
+	VMO = ao2mo.kernel(mol, mo_coeff) #np.eye(TTotal.shape[0]))
+	VMO = ao2mo.restore(1, VMO, hMO.shape[0])
+	hLO = reduce(np.dot, (StoOrig.T, mf.get_hcore(), StoOrig))
+	VLO = ao2mo.kernel(mol, StoOrig)
+	VLO = ao2mo.restore(1, VLO, hLO.shape[0])
+	hAO = mf.get_hcore()
+	VAO = ao2mo.kernel(mol, np.eye(StoOrig.shape[0]))
+	VAO = ao2mo.restore(1, VAO, hAO.shape[0])
+
+	TFrag = TTotal[:, SIndices]
+	#TFrag = np.concatenate((TFrag, mo_vir), axis = 1)
+
+	hFrag = reduce(np.dot, (TFrag.T, mf.get_hcore(), TFrag))
+	VFrag = ao2mo.kernel(mol, TFrag)
+	VFrag = ao2mo.restore(1, VFrag, hFrag.shape[0])
+
+	#VFrag = VSO[SIndices, :, :, :][:, SIndices, :, :][:, :, SIndices, :][:, :, :, SIndices]
+	#hFrag = hSO[SIndices, :][:, SIndices]
+	hNoCore = hFrag.copy()
+	#for i in SIndices:
+	#	for j in SIndices:
+	#		CoreContribution = 0.0
+	#		for c in CoreIdx:
+	#			CoreContribution += (2.0 * VSO[i, j, c, c] - VSO[i, c, c, j])
+	#		hFrag[i, j] += CoreContribution
+
+	#STFrag = S @ TFrag
+	#PFrag = STFrag.T @ PAO @ STFrag
+	GCore = GetGCore(VAO, PAO, VFrag, PHFFrag, TFrag)
+	hFrag = hNoCore + GCore
+	mp2 = mp.MP2(mf)
+	mp2.max_memory = 32000
+	E, T2 = mp2.kernel()
+	print("E_elec(MP2) =", mf.e_tot + E - mf.energy_nuc())
+	#EMP2 = mf.e_tot + E - mf.energy_nuc()	
+
+	Nocc = T2.shape[0]
+	Nvir = T2.shape[2]
+	Norb = Nocc + Nvir
+	print(T2.shape)
+	time1 = Timer("Make t2")
+	time1.start()
+	T2X = np.swapaxes(T2, 2, 3)
+	t2 = 2 * T2 - T2X
+	time1.stop()
+
+	EFragMP2, PFragMP2 = FragmentRMP2(hNoCore, hFrag, VFrag, FIndices, n = 2 * NumOccFrag)
+	np.save("PFrag", PFragMP2)
+	#print(EFragMP2 * 6)
+	mu = NewtonRaphson(ErrorChemicalPotential, 0.0, dErrorChemicalPotential, [[hNoCore, hFrag, VFrag, FIndices, 2 * NumOccFrag], nelec / NumFrag, FIndices])
+	hnew, hcorenew = UpdateOEIwithMu(hNoCore, hFrag, mu, FIndices)
+	EFrag, PFrag = FragmentRMP2(hnew, hcorenew, VFrag, FIndices, n = 2 * NumOccFrag, mu = mu)
+
+	print("BE Energy:", NumFrag * EFrag)
+'''	
