@@ -597,6 +597,7 @@ if __name__ == '__main__':
 	STFragAndPNO = S @ TFragAndPNO
 	PHFFragAndPNO = STFragAndPNO.T @ PAO @ STFragAndPNO
 	GCore = GetGCore(VAO, PAO, VFragAndPNO, PHFFragAndPNO, TFragAndPNO)
+	hFragAndPNO = hFragAndPNO + GCore
 	np.save("GCorePNO", GCore)
 	np.save("PHFFBPNO", PHFFragAndPNO)
 	np.save("VFBPNO", VFragAndPNO)
