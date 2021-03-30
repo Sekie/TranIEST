@@ -206,13 +206,32 @@ def GetGCore(VAO, PAO, VFrag, PFrag, TFrag):
 	
 def CalcFragEnergy(h, hcore, V, P, G, CenterIndices):
 	n = h.shape[0]
-	AllIndices = list(range(n))
 	hhFrag = h[CenterIndices] + hcore[CenterIndices]
 	PFrag = P[CenterIndices]
 	E1 = (hhFrag * PFrag).sum() / 2
 	VFrag = V[CenterIndices]
 	GFrag = G[CenterIndices]
 	E2 = (VFrag * GFrag).sum() / 2
+	return E1 + E2
+
+def CalcFragEnergyPNO(h, hcore, V, P, G, CenterIndices):
+	n = h.shape[0]
+	AllIndices = list(range(n))
+	hhFrag = h[CenterIndices] + hcore[CenterIndices]
+	PFrag = P[CenterIndices]
+	E1 = (hhFrag * PFrag).sum() / 2
+	E1 += (hhFrag * PFrag)[CenterIndices, :][:, -NUMPNO:].sum() / 2 # PNO Energy
+	VFrag = V[CenterIndices]
+	GFrag = G[CenterIndices]
+	E2 = (VFrag * GFrag).sum() / 2
+	pnoidx = list(range(V.shape[0] - NUMPNO, V.shape[0]))
+	allidx = list(range(V.shape[0]))
+	VG = VFrag * GFrag
+	CPSS = VG[np.ix_(CenterIndices, pnoidx, allidx, allidx)]
+	CSPS = VG[np.ix_(CenterIndices, allidx, pnoidx, allidx)]
+	CSSP = VG[np.ix_(CenterIndices, allidx, allidx, pnoidx)]
+	V2PNO = CPSS.sum() / 2 + CSPS.sum() / 2 + CSSP.sum() / 2
+	E2 = E2 + V2PNO
 	return E1 + E2
 
 def CalcFragEnergy_(h, hcore, V, P, G):
@@ -332,7 +351,7 @@ if __name__ == '__main__':
 	#	angle = i / 20.0 * 2.0 * np.pi
 	#	#mol.atom.append(('C', (CC * np.sin(angle), CC * np.cos(angle), 0)))
 	#		mol.atom.append(('H', ((CH + CC) * np.sin(angle), (CH + CC) * np.cos(angle), 0)))
-	mol.basis = 'sto-3g'
+	mol.basis = 'cc-pvdz'
 	# H - 5 basis functions, C - 14 basis functions
 	mol.build()
 	ne = mol.nelec
@@ -360,6 +379,7 @@ if __name__ == '__main__':
 	S = mol.intor_symmetric("int1e_ovlp")
 	N = S.shape[0]
 	mo_coeff = mf.mo_coeff
+	np.save("mo_coeff", mo_coeff)
 	StoOrth = get_symm_mat_pow(S, 0.50)
 	StoOrig = get_symm_mat_pow(S, -0.5)
 	np.save("StoOrth", StoOrth)
@@ -377,7 +397,9 @@ if __name__ == '__main__':
 	eEnv, vEnv = np.linalg.eigh(PEnvBath)
 	thresh = 1.e-6
 	BathOrbs = [i for i, v in enumerate(eEnv) if v > thresh and v < 1.0 - thresh]
-	print(len(BathOrbs))
+	#[74..89]
+	#print(BathOrbs)
+	#BathOrbs = list(range(74, 94))
 	EnvOrbs  = [i for i, v in enumerate(eEnv) if v < thresh or v > 1.0 - thresh]
 	CoreOrbs = [i for i, v in enumerate(eEnv) if v > 1.0 - thresh]
 	print(len(CoreOrbs))
@@ -389,6 +411,7 @@ if __name__ == '__main__':
 	TFrag[FIdx, :] = np.eye(Nf)
 	TSch = np.concatenate((TFrag, TBath), axis = 1)
 	T = np.concatenate((TSch, TEnv), axis = 1)
+	np.save("T", T)
 	BathOrbs = [x + Nf for x in BathOrbs]
 	SchOrbs = list(range(Nf)) + BathOrbs
 	EnvOrbs = [x + Nf for x in EnvOrbs]
@@ -399,6 +422,7 @@ if __name__ == '__main__':
 	print(PSch)
 	print(PEnv)
 	PSO = reduce(np.dot, (T.T, P, T))
+	np.save("PSO", PSO)
 	FIndices = list(range(Nf)) # In the Schmidt space
 	BIndices = list(range(Nf, Nf + len(BathOrbs))) # In the Schmidt space
 	print("Num Frag and Bath", Nf, len(BathOrbs))
@@ -408,6 +432,7 @@ if __name__ == '__main__':
 
 	PHFFrag = PSO[np.ix_(SIndices, SIndices)]
 	NumOccFrag = int(round(np.trace(PHFFrag)))
+	print("Num Electrons: ", 2 * NumOccFrag)
 
 	TTotal = np.dot(StoOrig, T) # AO to SO
 	TMOtoAO = np.linalg.inv(mo_coeff)
@@ -430,11 +455,13 @@ if __name__ == '__main__':
 	VAO = ao2mo.restore(1, VAO, hAO.shape[0])
 
 	TFrag = TTotal[:, SIndices]
+	np.save("TFrag", TFrag)
 	#TFrag = np.concatenate((TFrag, mo_vir), axis = 1)
 
 	hFrag = reduce(np.dot, (TFrag.T, mf.get_hcore(), TFrag))
 	VFrag = ao2mo.kernel(mol, TFrag)
 	VFrag = ao2mo.restore(1, VFrag, hFrag.shape[0])
+	np.save("VFrag", VFrag)
 
 	#VFrag = VSO[SIndices, :, :, :][:, SIndices, :, :][:, :, SIndices, :][:, :, :, SIndices]
 	#hFrag = hSO[SIndices, :][:, SIndices]
@@ -451,11 +478,12 @@ if __name__ == '__main__':
 	GCore = GetGCore(VAO, PAO, VFrag, PHFFrag, TFrag)
 	np.save("GCore", GCore)
 	hFrag = hNoCore + GCore
+	np.save("hFrag", hFrag)
 	mp2 = mp.MP2(mf)
 	mp2.max_memory = 32000
 	E, T2 = mp2.kernel()
 
-	MP2RDM = mp2.make_rdm1()
+	MP2RDM = 0.5 * mp2.make_rdm1()
 	MP2RDMAO = TMOtoAO.T @ MP2RDM @ TMOtoAO
 
 	print("E_elec(MP2) =", mf.e_tot + E - mf.energy_nuc())
@@ -484,6 +512,7 @@ if __name__ == '__main__':
 	time2 = Timer("Make TMOtoLO")
 	time2.start()
 	TMOtoLO = np.dot(TMOtoAO, StoOrig)
+	np.save("TMOtoLO", TMOtoLO)
 	time2.stop()
 
 	# PNO Bath theory
@@ -521,7 +550,7 @@ if __name__ == '__main__':
 
 
 	# PNO-BE Theory
-	
+		
 	print("BEGIN PNO-BE")
 	# pnobe_tol = 1e-3
 	num_pno = 1
@@ -535,7 +564,10 @@ if __name__ == '__main__':
 	VirIdx = list(range(Nocc, Norb))
 	TMO[np.ix_(OccIdx, OccIdx, VirIdx, VirIdx)] = T2
 	tMO[np.ix_(OccIdx, OccIdx, VirIdx, VirIdx)] = t2
+	np.save("T2", T2)
 
+	# Below is for LLVV amplitudes
+	
 	T2MMVV = np.zeros((Norb, Norb, Nvir, Nvir))
 	t2MMVV = np.zeros((Norb, Norb, Nvir, Nvir))
 	time3.stop()
@@ -550,33 +582,60 @@ if __name__ == '__main__':
 	t2LLVV = HalfRotate4DTensor(t2MMVV, TMOtoLO) #np.einsum('ijkl,ia,jb->abkl', t2MMVV, TMOtoLO, TMOtoLO)
 	time7.stop()
 
+	np.save("T2LLVV", T2LLVV)
 	time4 = Timer("Make Pair Density")
 	time4.start()
 	PairP = MakePairDensity(T2LLVV, t2LLVV) #np.zeros((len(FIndices), len(FIndices), Nvir, Nvir))
+	np.save("t2LLVV", t2LLVV)
+	np.save("PairPLLVV", PairP)
 	time4.stop()
 	print("Fragment-NonFragment block of Pair Density")
 	print(np.sqrt((PairP[np.ix_(FIndices, BEIndices)]**2).sum()))
 	time5 = Timer("Trace pair density")
 	time5.start()
 	PairPFrag = TracePairDensity(PairP, Idx = FIndices)
+	np.save("FragPairP", PairPFrag)
 	time5.stop()
-	ePNO, vPNO = np.linalg.eigh(PairPFrag)
+
+	PairPFragLO = TMOtoLO[Nocc:].T @ PairPFrag @ TMOtoLO[Nocc:]
+	np.save("FragPairPLO", PairPFragLO)
+	ProjE = np.eye(TSch.shape[0]) - TSch @ TSch.T
+	PairPFragLO = ProjE @ PairPFragLO @ ProjE
+
+	ePNO, vPNO = np.linalg.eigh(PairPFragLO)
 	print(ePNO)
 	np.savetxt("ePNO.txt", ePNO, delimiter = '\n')
 	#PNOIdx = [i for i, v in enumerate(ePNO) if v > pnobe_tol]
 	PNOIdx = list(range(len(ePNO) - num_pno, len(ePNO)))
 	print("Number of included PNOs:", len(PNOIdx))
 	PNOs = vPNO[:, PNOIdx]
-	TMOtoPNO = np.zeros((Norb, len(PNOIdx)))
-	TMOtoPNO[VirIdx, :] = PNOs
+	#TMOtoPNO = np.zeros((Norb, len(PNOIdx)))
+	#TMOtoPNO[VirIdx, :] = PNOs
+	#TAOtoPNO = np.dot(mo_coeff, TMOtoPNO)
+	TLOtoPNO = PNOs
+	TAOtoPNO = StoOrig @ TLOtoPNO
+
+	# Below is for LLLL amplitudes
+	#T2LLLL = Rotate4DTensor(TMO, TMOtoLO)
+	#t2LLLL = Rotate4DTensor(tMO, TMOtoLO)
+	#PairP = MakePairDensity(T2LLLL, t2LLLL)
+	#PairPFrag = TracePairDensity(PairP, Idx = FIndices)
+	#np.save("PairP", PairP)
+	#np.save("FragPairP", PairPFrag)
+	#ePNO, vPNO = np.linalg.eigh(PairPFrag)
+	#np.save("ePNO", ePNO)
+	#np.save("vPNO", vPNO)
+	#TLOtoPNO = vPNO[:,-num_pno:]
+	#TAOtoPNO = StoOrig @ TLOtoPNO
+	#np.save("TLOtoPNO", TLOtoPNO)
 
 	time6 = Timer("rotate ints")
 	time6.start()
-	TAOtoPNO = np.dot(mo_coeff, TMOtoPNO)
 	TFragAndPNO = np.concatenate((TFrag, TAOtoPNO), axis = 1)
-	TLOtoFBPNO_NotOrth = StoOrth @ TFragAndPNO
-	TLOtoFBPNO = GramSchmidt(TLOtoFBPNO_NotOrth, TFrag.shape[1] - 1)
-	TFragAndPNO = StoOrig @ TLOtoFBPNO
+	#TLOtoFBPNO = StoOrth @ TFragAndPNO
+	# TLOtoFBPNO = GramSchmidt(TLOtoFBPNO_NotOrth, TFrag.shape[1] - 1)
+	#np.save("TLOtoFragPNO", TLOtoFBPNO)
+	#TFragAndPNO = StoOrig @ TLOtoFBPNO
 	np.save("TFBPNO", TFragAndPNO)
 	hFragAndPNO = reduce(np.dot, (TFragAndPNO.T, mf.get_hcore(), TFragAndPNO))
 	VFragAndPNO = ao2mo.kernel(mol, TFragAndPNO)
@@ -600,6 +659,7 @@ if __name__ == '__main__':
 	hFragAndPNO = hFragAndPNO + GCore
 	np.save("GCorePNO", GCore)
 	np.save("PHFFBPNO", PHFFragAndPNO)
+	np.save("hFBPNO", hFragAndPNO)
 	np.save("VFBPNO", VFragAndPNO)
 
 	NumOccFrag = int(round(np.trace(PHFFragAndPNO)))
@@ -608,7 +668,7 @@ if __name__ == '__main__':
 	
 	EFragMP2, PFragMP2 = FragmentRMP2(hNoCore, hFragAndPNO, VFragAndPNO, FIndices, n = 2 * NumOccFrag)
 	np.savetxt("bepno-density0.txt", PFragMP2, delimiter = '\t')
-	#print(EFragMP2 * 6)
+	print("PNO-BE0 Energy =", EFragMP2 * 6)
 	print(Timer.timers)
 	mu = BisectionMethod(ErrorChemicalPotential, [-2., 2.], [[hNoCore, hFragAndPNO, VFragAndPNO, FIndices, 2 * NumOccFrag], nelec / NumFrag, FIndices], tol = 1e-5)
 	#mu = NewtonRaphson(ErrorChemicalPotential, 0.0, dErrorChemicalPotential, [[hNoCore, hFragAndPNO, VFragAndPNO, FIndices, 2 * NumOccFrag], nelec / NumFrag, FIndices])
@@ -618,13 +678,13 @@ if __name__ == '__main__':
 
 
 	print("PNO-BE Energy:", NumFrag * EFrag)
-	
+		
 
 
 	# PNO Disentanglement method
 '''	
 	print("BEGIN PNO DISENTANGLE")	
-	PNO_RDM_lambda = 1.
+	PNO_RDM_lambda = 1e-4
 
 	TMO = np.zeros(VMO.shape)
 	tMO = np.zeros(VMO.shape)
@@ -635,8 +695,11 @@ if __name__ == '__main__':
 
 	TLO = Rotate4DTensor(TMO, TMOtoLO)
 	tLO = Rotate4DTensor(tMO, TMOtoLO)
-	MP2RDM = TMOtoLO.T @ MP2RDM @ TMOtoLO
-	np.save("MP2RDM", MP2RDM)
+	np.save("MP2MO", MP2RDM)
+	MP2RDM = mo_coeff @ MP2RDM @ mo_coeff.T
+	np.save("MP2AO", MP2RDM)
+	MP2RDM = StoOrth.T @ MP2RDM @ StoOrth
+	np.save("MP2LO", MP2RDM)
 
 	PairP = MakePairDensity(TLO, tLO)
 	PairPFrag = TracePairDensity(PairP, Idx = FIndices)
@@ -650,17 +713,17 @@ if __name__ == '__main__':
 	mo_vir = mo_coeff[:, nocc:]
 	#mo_vir = np.dot(StoOrth.T, mo_vir) # Maybe not the best idea to localize it
 	P = np.dot(mo_occ, mo_occ.T)
+	print(np.trace(P), np.trace(MP2RDM))
 	FIdx = list(range(FragStart, FragEnd))
 	AIdx = list(range(N))
 	BEIdx = list(set(AIdx) - set(FIdx))
-	np.save("HFRDM", P)
 	PEnvBath = (1.0 - PNO_RDM_lambda) * P[np.ix_(BEIdx, BEIdx)] + PNO_RDM_lambda * MP2RDM[np.ix_(BEIdx, BEIdx)] #PairPFrag[np.ix_(BEIdx, BEIdx)]
+	#PEnvBath = (1.0 - PNO_RDM_lambda) * P[np.ix_(BEIdx, BEIdx)] + PNO_RDM_lambda * PairPFrag[np.ix_(BEIdx, BEIdx)]
 	eEnv, vEnv = np.linalg.eigh(PEnvBath)
-	pnolambdaname = "mp2lambda_" + str(PNO_RDM_lambda)
-	np.savetxt(pnolambdaname, eEnv, delimiter = '\n')
+	np.save("vEnv", vEnv)
 	thresh = 1.e-6
 	BathOrbs = [i for i, v in enumerate(eEnv) if v > thresh and v < 1.0 - thresh]
-	print(len(BathOrbs))
+	print(BathOrbs)
 	EnvOrbs  = [i for i, v in enumerate(eEnv) if v < thresh or v > 1.0 - thresh]
 	CoreOrbs = [i for i, v in enumerate(eEnv) if v > 1.0 - thresh]
 	print(len(CoreOrbs))
@@ -691,7 +754,7 @@ if __name__ == '__main__':
 
 	PHFFrag = PSO[np.ix_(SIndices, SIndices)]
 	NumOccFrag = int(round(np.trace(PHFFrag)))
-	print("Num Electrons in Fragment:", NumOccFrag * 2)
+	print("Num Electrons in Fragment:", NumOccFrag * 2, np.trace(PHFFrag))
 
 	TTotal = np.dot(StoOrig, T) # AO to SO
 	TMOtoAO = np.linalg.inv(mo_coeff)

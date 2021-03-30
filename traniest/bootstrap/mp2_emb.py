@@ -324,7 +324,7 @@ def ReshapeTwo(V):
 						VExpand[j, i, l, k] = V[ij, kl]
 		return VExpand
 
-def TwoExternal(V, VbbAA = None, ReturnFull = False, UpperTriangleSVD = False):
+def TwoExternal(V, VbbAA = None, ReturnFull = False, UpperTriangleSVD = False, ReturnT = False):
 	OrigDim = V.shape
 	nF = OrigDim[0]
 	if UpperTriangleSVD:
@@ -349,8 +349,12 @@ def TwoExternal(V, VbbAA = None, ReturnFull = False, UpperTriangleSVD = False):
 		VExtended = VExtended @ TB.T
 		return ReshapeTwo(VExtended) #VExtended.reshape(nF, nF, nF, nF)
 	if UpperTriangleSVD:
-		return ReshapeTwo(VExtended) 
+		if ReturnT:
+			return ReshapeTwo(VExtended), T
+		return ReshapeTwo(VExtended)
 	else:
+		if ReturnT:
+			return VExtended.reshape(nF, nF, nF, nF), T
 		return VExtended.reshape(nF, nF, nF, nF)
 
 def MakeVFFBB(VFFAA):
