@@ -49,7 +49,7 @@ def MP2Corr(V, g, nOcc):
 		for j in range(nOcc):
 			for a in range(nVir):
 				for b in range(nVir):
-					ECorr += (2. * V[i, nVir + a, j, nVir + b] - V[i, nVir + b, j, nVir + a]) * V[i, nVir + a, j, nVir + b]# / (g[nOcc + a] + g[nOcc + b] - g[i] - g[j])
+					ECorr += (2. * V[i, nOcc + a, j, nOcc + b] - V[i, nOcc + b, j, nOcc + a]) * V[i, nOcc + a, j, nOcc + b]# / (g[nOcc + a] + g[nOcc + b] - g[i] - g[j])
 	return ECorr
 
 def PartialMP2Corr(V):
