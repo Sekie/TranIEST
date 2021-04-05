@@ -134,8 +134,10 @@ if __name__ == "__main__":
 	from pyscf import mp, lo, ao2mo
 	from frankenstein.tools.tensor_utils import get_symm_mat_pow
 
+	import time
+
 	mol = gto.Mole()
-	mol.fromfile("/work/henry/Calculations/BE/Acene/sto-3g/geom/1.xyz")
+	mol.fromfile("/work/henry/Calculations/BE/C16_ex/geom/C16_ether.xyz")
 	mol.basis = 'cc-pvdz'
 	mol.build()
 
@@ -175,17 +177,22 @@ if __name__ == "__main__":
 	HF_E2 = []
 	MP_E1 = []
 	MP_E2 = []
+	t1 = []
+	t2 = []
 
 	for Rank in Ranks:
 		print("Running for Rank", Rank)
+		startCD = time.time()
 		L_CD = AuxBasisCD(VAO, Rank = Rank)
+		endCD = time.time()
+		startDG = time.time()
 		L_DG = AuxBasisDIAG(VAO, Rank = Rank)
-		print("... calculated L")
+		endDG = time.time()
+		print("... calculated L in following time:", endCD - startCD, endDG - startDG)
 		VMO_CD = RotateTEIAuxBasis(L_CD, mf.mo_coeff)
 		VMO_DG = RotateTEIAuxBasis(L_DG, mf.mo_coeff)
 		print("... calculated VMO")
 		# V_E1, V_E2 = CompareV(VMO, VMO_CD, VMO_DG)
-		# E_E1, E_E2, F_E1, F_E2 = CompareHF(hMO, VMO_CD, VMO_DG, mol.nelectron, mf, doMP2 = True, e_mp2 = mymp.e_tot)
 		E_E1, E_E2 = CompareHF(hMO, VMO_CD, VMO_DG, nOcc)
 		F_E1, F_E2 = CompareMP2(VMO_CD, VMO_DG, mf.mo_energy, nOcc)
 		print("... calculated Energy")
@@ -193,6 +200,8 @@ if __name__ == "__main__":
 		HF_E2.append(E_E2)
 		MP_E1.append(F_E1)
 		MP_E2.append(F_E2)
+		t1.append(endCD - startCD)
+		t2.append(endDG - startDG)
 
 	print("HF Energies")
 	print(HF_E1)
@@ -201,11 +210,13 @@ if __name__ == "__main__":
 	print(MP_E1)
 	print(MP_E2)
 	N = len(Ranks)
-	Results = np.zeros((N, 5))
+	Results = np.zeros((N, 7))
 	Results[:, 0] = Ranks
 	Results[:, 1] = HF_E1
-	Results[:, 2] = HF_E1
+	Results[:, 2] = HF_E2
 	Results[:, 3] = MP_E1
 	Results[:, 4] = MP_E2
+	Results[:, 5] = t1
+	Results[:, 6] = t2
 
 	np.savetxt("df_results.txt", Results, delimiter = '\t')
