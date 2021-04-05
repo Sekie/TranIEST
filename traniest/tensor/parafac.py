@@ -1,8 +1,10 @@
 import numpy as np
 from tensorly.tenalg import khatri_rao
 
-def VectorsToTensor(As):
+def VectorsToTensor(As, Ls = None):
 	Dim = ()
+	if Ls is None:
+		Ls = np.ones((As[0].shape[1],))
 	for A in As:
 		iN = A.shape[0]
 		Dim += (iN, )
@@ -11,11 +13,11 @@ def VectorsToTensor(As):
 		ais = []
 		for A in As:
 			ais.append(A[:, r])
-		X += np.prod(np.ix_(*ais))
+		X += Ls[r] * np.prod(np.ix_(*ais))
 	return X
 
-def PARAFACError(X, As):
-	x = VectorsToTensor(As)
+def PARAFACError(X, As, Ls = None):
+	x = VectorsToTensor(As, Ls = Ls)
 	return np.sqrt(((X - x)**2).sum())
 
 def Matricize(X, m):
@@ -67,10 +69,14 @@ def InitA(I, r):
 		As.append(A)
 	return As
 
-def PARAFAC(X, R, max_iter = 1000):
+def PARAFAC(X, R, max_iter = 1000, Normalize = True):
 	I = X.shape
 	As = InitHOSVD(X, R)
 	for i in range(max_iter):
+		if Normalize:
+			Ls = np.ones((R,))
+		else:
+			Ls = None
 		for n in range(len(I)):
 			V = np.ones((R, R))
 			
@@ -79,14 +85,23 @@ def PARAFAC(X, R, max_iter = 1000):
 					continue
 				else:
 					V *= A.T @ A
+			if Normalize:
+				LMat = np.zeros((R, R))
+				LMat = np.fill_diagonal(LMat, Ls)
+				V = LMat @ V
 			W = khatri_rao(As, skip_matrix = n)
 			Xn = Matricize(X, n)
 			As[n] = Xn @ W @ np.linalg.pinv(V)
-		Err = PARAFACError(X, As)
+			if Normalize:
+				for j in range(As[n].shape[1]):
+					norm = np.linalg.norm(As[n][:, j])
+					As[n][:, j] /= norm
+					Ls[j] *= norm
+		Err = PARAFACError(X, As, Ls = Ls)
 		print("PARAFAC Iteration", i, "complete with error", Err)
 		if Err < 1e-6:
 			break
-	return As
+	return As, Ls
 
 if __name__ == "__main__":
 	X = np.zeros((3, 4, 2))
@@ -104,9 +119,9 @@ if __name__ == "__main__":
 	#print(Y[:, :, 0])
 	#print(Y[:, :, 1])	
 
-	As = PARAFAC(X, 2, max_iter = 10)
-	print(As[0].T @ As[0])
+	As, Ls = PARAFAC(X, 2, max_iter = 10, Normalize = False)
 	from tensorly.decomposition import parafac
 	S, Us = parafac(X, 2, n_iter_max = 10, normalize_factors = False)
 	print(S)
-	print(PARAFACError(X, Us))	
+	print(Us)
+	print(PARAFACError(X, Us, Ls = S))	
