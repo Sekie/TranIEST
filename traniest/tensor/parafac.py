@@ -118,26 +118,22 @@ def PARAFAC(X, R, max_iter = 1000, Normalize = False):
 		else:
 			Ls = None
 		for n in range(len(I)):
-			V = np.ones((R, R))
-			
+			#V = np.ones((R, R))
+			#for m, A in enumerate(As):
+			#	if m == n:
+			#		continue
+			#	else:
+			#		V *= A.T @ A
+
 			W = khatri_rao(As, skip_matrix = n)
 			Xn = Matricize(X, n)
-			for m, A in enumerate(As):
-				if m == n:
-					continue
-				else:
-					V *= A.T @ A
-			if Normalize:
-				LMat = np.zeros((R, R))
-				np.fill_diagonal(LMat, Ls)
-				V = LMat @ V
-				W = W
-			As[n] = Xn @ W @ np.linalg.inv(W.T @ W) @ np.linalg.inv(LMat)
+			As[n] = Xn @ W @ np.linalg.inv(W.T @ W)
 			#As[n] = Xn @ W @ np.linalg.pinv(V)
-			if Normalize:
-				for j in range(As[n].shape[1]):
-					norm = np.linalg.norm(As[n][:, j])
-					As[n][:, j] /= norm
+		if Normalize:
+			for A in As:
+				for j in range(A.shape[1]):
+					norm = np.linalg.norm(A[:, j])
+					A[:, j] /= norm
 					Ls[j] *= norm
 		Err = PARAFACError(X, As, Ls = Ls)
 		print("PARAFAC Iteration", i, "complete with error", Err)
