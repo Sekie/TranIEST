@@ -1,5 +1,6 @@
 import numpy as np
 from tensorly.tenalg import khatri_rao
+from traniest.tools.tensor_utils import get_symm_mat_pow
 
 def VectorsToTensor(As, Ls = None):
 	Dim = ()
@@ -14,6 +15,7 @@ def VectorsToTensor(As, Ls = None):
 		for A in As:
 			ais.append(A[:, r])
 		X += Ls[r] * np.prod(np.ix_(*ais))
+	print(X)
 	return X
 
 def PARAFACError(X, As, Ls = None):
@@ -69,7 +71,7 @@ def InitA(I, r):
 		As.append(A)
 	return As
 
-def PARAFAC(X, R, max_iter = 1000, Normalize = True):
+def PARAFAC_Orth(X, R, max_iter = 1000, Normalize = False):
 	I = X.shape
 	As = InitHOSVD(X, R)
 	for i in range(max_iter):
@@ -85,13 +87,53 @@ def PARAFAC(X, R, max_iter = 1000, Normalize = True):
 					continue
 				else:
 					V *= A.T @ A
-			if Normalize:
-				LMat = np.zeros((R, R))
-				LMat = np.fill_diagonal(LMat, Ls)
-				V = LMat @ V
 			W = khatri_rao(As, skip_matrix = n)
 			Xn = Matricize(X, n)
-			As[n] = Xn @ W @ np.linalg.pinv(V)
+			Y = get_symm_mat_pow(W.T @ Xn.T @ Xn @ W, -0.50) # W @ np.linalg.pinv(V)
+			As[n] = Xn @ W @ Y
+			AOrig = Xn @ W @ np.linalg.inv(W.T @ W)
+			if Normalize:
+				for j in range(AOrig.shape[1]):
+					norm = np.linalg.norm(AOrig[:, j])
+					Ls[j] *= norm
+			if Normalize:
+				LMat = np.zeros((R, R))
+				np.fill_diagonal(LMat, Ls)
+			print(Ls)
+			TL = get_symm_mat_pow(LMat, 0.5)
+			As[n] = As[n] @ TL
+		Err = PARAFACError(X, As, Ls = Ls)
+		print("PARAFAC Iteration", i, "complete with error", Err)
+		if Err < 1e-6:
+			break
+	return As, Ls
+
+
+def PARAFAC(X, R, max_iter = 1000, Normalize = False):
+	I = X.shape
+	As = InitHOSVD(X, R)
+	for i in range(max_iter):
+		if Normalize:
+			Ls = np.ones((R,))
+		else:
+			Ls = None
+		for n in range(len(I)):
+			V = np.ones((R, R))
+			
+			W = khatri_rao(As, skip_matrix = n)
+			Xn = Matricize(X, n)
+			for m, A in enumerate(As):
+				if m == n:
+					continue
+				else:
+					V *= A.T @ A
+			if Normalize:
+				LMat = np.zeros((R, R))
+				np.fill_diagonal(LMat, Ls)
+				V = LMat @ V
+				W = W
+			As[n] = Xn @ W @ np.linalg.inv(W.T @ W) @ np.linalg.inv(LMat)
+			#As[n] = Xn @ W @ np.linalg.pinv(V)
 			if Normalize:
 				for j in range(As[n].shape[1]):
 					norm = np.linalg.norm(As[n][:, j])
@@ -119,9 +161,7 @@ if __name__ == "__main__":
 	#print(Y[:, :, 0])
 	#print(Y[:, :, 1])	
 
-	As, Ls = PARAFAC(X, 2, max_iter = 10, Normalize = False)
+	As, Ls = PARAFAC(X, 2, max_iter = 10, Normalize = True)
 	from tensorly.decomposition import parafac
-	S, Us = parafac(X, 2, n_iter_max = 10, normalize_factors = False)
-	print(S)
-	print(Us)
+	S, Us = parafac(X, 2, n_iter_max = 10, orthogonalise = False, normalize_factors = True)
 	print(PARAFACError(X, Us, Ls = S))	
