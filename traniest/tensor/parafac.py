@@ -1,4 +1,6 @@
 import numpy as np
+from scipy.linalg import qr
+from scipy.optimize import least_squares
 from tensorly.tenalg import khatri_rao
 from traniest.tools.tensor_utils import get_symm_mat_pow
 
@@ -15,13 +17,24 @@ def VectorsToTensor(As, Ls = None):
 		for A in As:
 			ais.append(A[:, r])
 		X += Ls[r] * np.prod(np.ix_(*ais))
-	print(X)
 	return X
 
-def PARAFACError(X, As, Ls = None):
+def PARAFACError(X, As, Ls = None, ReturnVector = False):
 	x = VectorsToTensor(As, Ls = Ls)
+	if ReturnVector:
+		return (X - x)
 	return np.sqrt(((X - x)**2).sum())
 
+def DIIS_Solve(Es):
+	B = np.full((len(Es) + 1, len(Es) + 1), -1.0)
+	for i in len(Es):
+		for j in len(Es):
+			B[i, j] = (Es[i] * Es[j]).sum()
+	B[len(Es), len(Es)] = 0.0
+	y = np.zeros((len(Es) + 1,))
+	y[len(Es)] = -1.0
+	c = np.linalg.solve(B, y)
+	
 def Matricize(X, m):
 	I = X.shape
 	IArr = np.array(I)
@@ -71,37 +84,48 @@ def InitA(I, r):
 		As.append(A)
 	return As
 
-def PARAFAC_Orth(X, R, max_iter = 1000, Normalize = False):
+def PARAFAC_Orth(X, R, max_iter = 1000, DIIS = 0, verbose = 0):
 	I = X.shape
 	As = InitHOSVD(X, R)
+	def OptL(weights, factors, tensor):
+		return PARAFACError(tensor, factors, Ls = weights)
+	Ls = np.ones((R,))
+	if DIIS > 0:
+		ErrorVecs = []
+		for i in range(len(I)):
+			ErrorVecs.append([])
 	for i in range(max_iter):
-		if Normalize:
-			Ls = np.ones((R,))
-		else:
-			Ls = None
 		for n in range(len(I)):
-			V = np.ones((R, R))
-			
-			for m, A in enumerate(As):
-				if m == n:
-					continue
-				else:
-					V *= A.T @ A
 			W = khatri_rao(As, skip_matrix = n)
 			Xn = Matricize(X, n)
 			Y = get_symm_mat_pow(W.T @ Xn.T @ Xn @ W, -0.50) # W @ np.linalg.pinv(V)
 			As[n] = Xn @ W @ Y
-			AOrig = Xn @ W @ np.linalg.inv(W.T @ W)
-			if Normalize:
-				for j in range(AOrig.shape[1]):
-					norm = np.linalg.norm(AOrig[:, j])
-					Ls[j] *= norm
-			if Normalize:
-				LMat = np.zeros((R, R))
-				np.fill_diagonal(LMat, Ls)
-			print(Ls)
-			TL = get_symm_mat_pow(LMat, 0.5)
-			As[n] = As[n] @ TL
+		Ls = least_squares(OptL, Ls, args = [As, X]).x
+		Err = PARAFACError(X, As, Ls = Ls)
+		if verbose > 0:
+			print("PARAFAC Iteration", i, "complete with error", Err)
+		if Err < 1e-6:
+			break
+	print("PARAFAC complete with error", Err)
+	return As, Ls
+
+def PARAFAC_OrthQR(X, R, max_iter = 1000, Normalize = False):
+	I = X.shape
+	As = InitHOSVD(X, R)
+	for i in range(max_iter):
+		Ls = np.ones((R,))
+		# Pre orthogonalize all factor matrices
+		for n in range(len(As)):
+			As[n] = qr(As[n], mode = 'economic')[0]
+		for n in range(len(I)):
+			W = khatri_rao(As, skip_matrix = n)
+			Xn = Matricize(X, n)
+			As[n] = Xn @ W @ np.linalg.inv(W.T @ W)
+		for A in As:
+			for j in range(A.shape[1]):
+				norm = np.linalg.norm(A[:, j])
+				A[:, j] /= norm
+				Ls[j] *= norm
 		Err = PARAFACError(X, As, Ls = Ls)
 		print("PARAFAC Iteration", i, "complete with error", Err)
 		if Err < 1e-6:
@@ -136,17 +160,18 @@ def PARAFAC(X, R, max_iter = 1000, Normalize = False):
 					A[:, j] /= norm
 					Ls[j] *= norm
 		Err = PARAFACError(X, As, Ls = Ls)
-		print("PARAFAC Iteration", i, "complete with error", Err)
 		if Err < 1e-6:
 			break
+	print("PARAFAC complete with error", Err)
 	return As, Ls
 
 if __name__ == "__main__":
 	X = np.zeros((3, 4, 2))
-	for i in range(X.shape[0]):
-		for j in range(X.shape[1]):
-			X[i, j, 0] = i + X.shape[0] * j + 1
-			X[i, j, 1] = i + X.shape[0] * j + 13
+	#for i in range(X.shape[0]):
+	#	for j in range(X.shape[1]):
+	#		X[i, j, 0] = i + X.shape[0] * j + 1
+	#		X[i, j, 1] = i + X.shape[0] * j + 13
+	X = np.random.rand(10,10,10,10)
 
 	#U = np.zeros((2, 3))
 	#for i in range(U.shape[0]):
@@ -157,7 +182,7 @@ if __name__ == "__main__":
 	#print(Y[:, :, 0])
 	#print(Y[:, :, 1])	
 
-	As, Ls = PARAFAC(X, 2, max_iter = 10, Normalize = True)
+	As, Ls = PARAFAC_Orth(X, 5, max_iter = 100)
 	from tensorly.decomposition import parafac
-	S, Us = parafac(X, 2, n_iter_max = 10, orthogonalise = False, normalize_factors = True)
-	print(PARAFACError(X, Us, Ls = S))	
+	S, Us = parafac(X, 5, n_iter_max = 100, orthogonalise = True, normalize_factors = False)
+	print(PARAFACError(X, Us, Ls = S))
